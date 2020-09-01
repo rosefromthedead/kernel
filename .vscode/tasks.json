@@ -1,0 +1,31 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build image",
+            "type": "shell",
+            "command": "./build.sh",
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Launch QEMU",
+            "type": "shell",
+            "command": "qemu-system-aarch64 -M virt -cpu cortex-a53 -m 1g -nographic -kernel build/kernel.ub",
+            "dependsOn": "Build image",
+            "problemMatcher": []
+        },
+        {
+            "label": "Launch QEMU with debug wait",
+            "type": "shell",
+            "command": "qemu-system-aarch64 -M virt -cpu cortex-a53 -m 1g -kernel build/kernel.ub -s -S &",
+            "dependsOn": "Build image",
+            "problemMatcher": []
+        }
+    ]
+}

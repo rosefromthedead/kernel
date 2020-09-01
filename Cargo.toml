@@ -1,0 +1,16 @@
+[package]
+name = "kernel"
+version = "0.1.0"
+authors = ["Rose Hudson <cv21874@bristol.ac.uk>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bitflags = "1.2.1"
+buddy_system_allocator = { git = "https://github.com/rosefromthedead/buddy_system_allocator" }
+cortex-a = { path = "./cortex-a" }
+spin = "0.5.2"
+
+[build-dependencies]
+cc = "1.0.59"
