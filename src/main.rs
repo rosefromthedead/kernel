@@ -3,28 +3,24 @@
 #![feature(alloc_error_handler)]
 #![feature(asm)]
 #![feature(const_fn)]
+#![feature(const_in_array_repeat_expressions)]
 #![feature(lang_items)]
+#![feature(maybe_uninit_extra)]
 #![feature(naked_functions)]
+#![feature(never_type)]
 #![feature(new_uninit)]
+#![feature(ptr_as_uninit)]
 
 extern crate alloc;
 
 mod arch;
 #[macro_use]
 mod console;
+mod context;
 mod memory;
 mod panic;
 mod vm;
 
-#[no_mangle]
-unsafe fn main() {
-    arch::init_regs();
-    console::virt::virt_putchar(b'a');
+pub fn main() {
 
-    arch::vm::VirtMem::init();
-    println!("Hello, universe!");
-
-    loop {
-        cortex_a::asm::wfi();
-    }
 }

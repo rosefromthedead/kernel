@@ -1,0 +1,4 @@
+{
+	"rust-analyzer.checkOnSave.overrideCommand": ["cargo", "check", "--target=aarch64-unknown-none", "-Zbuild-std=core,alloc", "--message-format=json"]
+}
+
