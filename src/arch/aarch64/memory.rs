@@ -7,7 +7,17 @@ pub struct Page([u8; 4096]);
 static mut KERNEL_HEAP: [Page; 1] = [Page([0; 4096]); 1];
 
 // for mapping the device tree, before we know where free memory is
-pub static mut SPARE_FRAMES: [Page; 8] = [Page([0; 4096]); 8];
+// annoying syntax
+pub static mut SPARE_FRAMES: [Page; 8] = [
+    Page([0; 4096]),
+    Page([0; 4096]),
+    Page([0; 4096]),
+    Page([0; 4096]),
+    Page([0; 4096]),
+    Page([0; 4096]),
+    Page([0; 4096]),
+    Page([0; 4096]),
+];
 
 #[no_mangle]
 static mut EARLY_STACK: Page = Page([0; 4096]);

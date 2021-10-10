@@ -1,3 +1,0 @@
-[submodule "cortex-a"]
-	path = cortex-a
-	url = git@github.com:rosehuds/cortex-a

@@ -1,4 +1,6 @@
 use byteorder::{ByteOrder, BE};
+use cortex_a::interfaces::{Writeable, ReadWriteable};
+
 use crate::println;
 use crate::vm::{PhysicalAddress, VirtualAddress, Table};
 use vm::table::{IntermediateLevel, IntermediateTable, Level0, Level1, Level2};
@@ -13,25 +15,32 @@ pub const FRAME_SIZE: usize = 4096;
 #[link_section = ".early_init"]
 #[no_mangle]
 #[naked]
-unsafe fn early_init() {
-    let dtb_phys: usize;
+unsafe extern "C" fn early_init() {
     asm!("
-        adrp {0}, EARLY_STACK
-        add {0}, {0}, #0x1000
-        mov sp, {0}
-    ", out(reg) _, out("x0") dtb_phys);
+        adrp x4, EARLY_STACK
+        add x4, x4, #0x1000
+        mov sp, x4
+        b {0}
+    ", sym init, options(noreturn));
+}
+
+unsafe fn init() {
+    // hope and pray that function prologue doesn't touch x0, because naked functions with stuff
+    // actually in the body aren't good apparently
+    let dtb_phys: usize;
+    asm!("", out("x0") dtb_phys);
     let dtb_phys = PhysicalAddress(dtb_phys);
 
     // Initiailise system registers
     {
-        use cortex_a::regs::*;
+        use cortex_a::registers::*;
         // Don't trap on FP/SIMD register access
         CPACR_EL1.write(CPACR_EL1::TTA::None + CPACR_EL1::FPEN::None + CPACR_EL1::ZEN::None);
     }
 
     // Initialise MMU + translation tables
     {
-        use cortex_a::regs::*;
+        use cortex_a::registers::*;
         let kernel_table_addr: usize;
         let kernel_remap_l1_addr: usize;
         let kernel_remap_l2_addr: usize;
