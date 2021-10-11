@@ -26,5 +26,3 @@ pub static mut DIRECT_MAP: IntermediateTable<Level1> = IntermediateTable::new();
 pub static mut KERNEL_IDENTITY_L0: IntermediateTable<Level0> = IntermediateTable::new();
 #[no_mangle]
 pub static mut KERNEL_IDENTITY_L1: IntermediateTable<Level1> = IntermediateTable::new();
-//TODO: when MP happens this will cause problems without offsets n stuff
-pub static mut CURRENT_USER_TABLE: VirtualAddress = VirtualAddress(0xFFFF_C000_0000_0000);

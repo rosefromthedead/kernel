@@ -77,6 +77,30 @@ pub struct IntermediateTable<L: IntermediateLevel> {
     _tables: PhantomData<L::Next>,
 }
 
+impl IntermediateTable<Level0> {
+    pub unsafe fn new_top_level() -> &'static mut Self {
+        let mut frame_allocator = crate::memory::FRAME_ALLOCATOR.lock();
+        let table_phys = frame_allocator.alloc();
+        let table_virt = phys_to_virt(table_phys);
+        &mut *(table_virt.0 as *mut Self)
+    }
+
+    pub unsafe fn get_current_el0_top_level() -> &'static mut Self {
+        let self_phys: usize;
+        asm!("mrs {0}, TTBR0_EL1", out(reg) self_phys);
+        &mut *(self_phys as *mut Self)
+    }
+
+    pub unsafe fn switch_el0_top_level(&mut self) {
+        let self_virt = self as *mut Self as usize;
+        asm!("
+            at s1e1r, {0}
+            mrs {1}, PAR_EL1
+            msr TTBR0_EL1, {1}
+        ", in(reg) self_virt, lateout(reg) _);
+    }
+}
+
 impl<L: IntermediateLevel> IntermediateTable<L> {
     pub const fn new() -> Self {
         Self {
@@ -502,7 +526,7 @@ struct Level3TableEntry {
 impl Level3TableEntry {
     const fn new(phys: PhysicalAddress) -> Self {
         let phys = phys.0 as u64 & 0x0000_FFFF_FFFF_F000;
-        let value = phys | 0b11 | (1 << 10) | 4;
+        let value = phys | 0b11 | (1 << 10) | (1 << 2) | (1 << 6);
         Self { value }
     }
 

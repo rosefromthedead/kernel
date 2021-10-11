@@ -1,6 +1,7 @@
 use byteorder::{ByteOrder, BE};
 use cortex_a::interfaces::{Writeable, ReadWriteable};
 
+use crate::arch::vm::{KERNEL_LOAD_PHYS, KERNEL_TABLE};
 use crate::println;
 use crate::vm::{PhysicalAddress, VirtualAddress, Table};
 use vm::table::{IntermediateLevel, IntermediateTable, Level0, Level1, Level2};
@@ -97,13 +98,6 @@ unsafe fn init() {
 
         SCTLR_EL1.modify(SCTLR_EL1::M::Enable);
 
-        let par: u64;
-        let addr: u64 = 0xFFFF_0000_0000_0000;
-        asm!("
-            at s1e1r, {0}
-            mrs {1}, PAR_EL1
-        ", in(reg) addr, lateout(reg) par);
-
         let difference = vm::KERNEL_OFFSET - vm::KERNEL_LOAD_PHYS.0;
         asm!("
             bl 1f
@@ -131,7 +125,6 @@ unsafe fn init() {
         + TCR_EL1::TG1::KiB_4);
     }
 
-    println!("Hello, universe!");
     memory::init_heap();
 
     {
@@ -158,7 +151,6 @@ unsafe fn init() {
         let address_cells = BE::read_u32(root.properties().find(|prop| prop.name == "#address-cells").unwrap().data);
         let size_cells = BE::read_u32(root.properties().find(|prop| prop.name == "#size-cells").unwrap().data);
         if address_cells != 2 || size_cells != 2 {
-            println!("Problem");
             panic!();
         }
 
@@ -174,13 +166,26 @@ unsafe fn init() {
             let dtb_end = dtb_phys + dtb_size;
             frame_allocator.insert_hole(dtb_end, start_addr + size - dtb_end);
         }
-
-        println!("Still alive");
     }
 
+    KERNEL_TABLE.map_to(VirtualAddress(0xFFFF_FF00_0000_0000), PhysicalAddress(0x0000_0000_0900_0000), 4096).unwrap();
+    println!("Hello, universe!");
     interrupt::init_interrupts();
 
-    let context = crate::context::Context::new();
+    {
+        let table = IntermediateTable::<Level0>::new_top_level();
+        table.map_to(VirtualAddress(0x0000_0000_9000_0000), KERNEL_LOAD_PHYS, 4096).unwrap();
+        table.switch_el0_top_level();
+        let par: u64;
+        asm!("
+            at s1e0r, {0}
+            mrs {1}, PAR_EL1
+        ", in(reg) 0x0000_0000_9000_0000u64, lateout(reg) par);
+        println!("{:#018X}", par);
+    }
+
+    let virt = (context::very_good_context) as *const fn() as usize - 0xFFFF_0000_0000_0000 + 0x0000_0000_9000_0000;
+    let context = crate::context::Context::new(VirtualAddress(virt));
     context.enter();
     context::very_good_context();
 }

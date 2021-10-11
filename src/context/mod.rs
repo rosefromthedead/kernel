@@ -11,11 +11,10 @@ pub enum ContextState {
 }
 
 impl Context {
-    pub fn new() -> Self {
-        let entry_virt = crate::arch::context::very_good_context as usize;
-        println!("{:#018X}", entry_virt);
+    pub fn new(entry_virt: VirtualAddress) -> Self {
+        println!("{:#018X}", entry_virt.0);
         Context {
-            state: ContextState::Suspended(ArchContext::new(VirtualAddress(entry_virt), VirtualAddress(0x0000_0000_8000_0000))),
+            state: ContextState::Suspended(ArchContext::new(entry_virt, VirtualAddress(0x0000_0000_8000_0000))),
         }
     }
 
