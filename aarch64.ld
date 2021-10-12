@@ -11,6 +11,7 @@ SECTIONS {
         __text_start = .;
         . += 64;
         *(.early_init*)
+        *(.interrupt_vectors*)
         *(.text*)
         . = ALIGN(4096);
         __text_end = .;

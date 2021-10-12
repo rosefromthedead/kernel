@@ -15,3 +15,6 @@ cortex-a = { git = "https://github.com/rosehuds/cortex-a" }
 #eyre = { version = "0.6.1", default-features = false }
 fdt = { git = "https://gitlab.redox-os.org/rosehuds/fdt" }
 spin = "0.5.2"
+
+[build-dependencies]
+cc = "1"
