@@ -3,39 +3,97 @@
 .global current_el_sp_el0_sync
 
 current_el_sp_el0_sync:
-    nop
+    mov x0, #0
+    mov x1, #0
+    bl demux_interrupt
+    b .
 .balign 0x80
 current_el_sp_el0_irq:
-    nop
+    mov x0, #0
+    mov x1, #1
+    bl demux_interrupt
+    b .
 .balign 0x80
 current_el_sp_el0_fiq:
-    nop
+    mov x0, #0
+    mov x1, #2
+    bl demux_interrupt
+    b .
 .balign 0x80
 current_el_sp_el0_serror:
-    nop
+    mov x0, #0
+    mov x1, #3
+    bl demux_interrupt
+    b .
 .balign 0x80
 current_el_sp_elx_sync:
     mov x0, #1
     mov x1, #0
-    b demux_interrupt
+    bl demux_interrupt
+    b .
 .balign 0x80
 current_el_sp_elx_irq:
-    nop
+    mov x0, #1
+    mov x1, #1
+    bl demux_interrupt
+    b .
 .balign 0x80
 current_el_sp_elx_fiq:
-    nop
+    mov x0, #1
+    mov x1, #2
+    bl demux_interrupt
+    b .
 .balign 0x80
 current_el_sp_elx_serror:
-    nop
+    mov x0, #1
+    mov x1, #3
+    bl demux_interrupt
+    b .
 .balign 0x80
 lower_el_aa64_sync:
-    nop
+    mov x0, #2
+    mov x1, #0
+    bl demux_interrupt
+    b .
 .balign 0x80
 lower_el_aa64_irq:
-    nop
+    mov x0, #2
+    mov x1, #1
+    bl demux_interrupt
+    b .
 .balign 0x80
 lower_el_aa64_fiq:
-    nop
+    mov x0, #2
+    mov x1, #2
+    bl demux_interrupt
+    b .
 .balign 0x80
 lower_el_aa64_serror:
-    nop
+    mov x0, #2
+    mov x1, #3
+    bl demux_interrupt
+    b .
+.balign 0x80
+lower_el_aa32_sync:
+    mov x0, #3
+    mov x1, #0
+    bl demux_interrupt
+    b .
+.balign 0x80
+lower_el_aa32_irq:
+    mov x0, #3
+    mov x1, #1
+    bl demux_interrupt
+    b .
+.balign 0x80
+lower_el_aa32_fiq:
+    mov x0, #3
+    mov x1, #2
+    bl demux_interrupt
+    b .
+.balign 0x80
+lower_el_aa32_serror:
+    mov x0, #3
+    mov x1, #3
+    bl demux_interrupt
+    b .

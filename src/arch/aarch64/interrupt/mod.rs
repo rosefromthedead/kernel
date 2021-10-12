@@ -12,6 +12,10 @@ pub fn init_interrupts() {
     VBAR_EL1.set(current_el_sp_el0_sync as *const fn() as u64);
 }
 
+// allow dead code because rustc thinks we never construct these variants; we construct them in
+// assembly in interrupts.S
+// same for InterruptType and InterruptArgs
+#[allow(dead_code)]
 #[repr(C)]
 #[derive(Debug)]
 enum InterruptSource {
@@ -21,6 +25,7 @@ enum InterruptSource {
     LowerElAa32 = 3,
 }
 
+#[allow(dead_code)]
 #[repr(C)]
 #[derive(Debug)]
 enum InterruptType {
@@ -30,9 +35,30 @@ enum InterruptType {
     SError = 3,
 }
 
+#[allow(dead_code)]
+#[repr(C)]
+#[derive(Debug)]
+struct InterruptArgs {
+    a: u64,
+    b: u64,
+    c: u64,
+    d: u64,
+    e: u64,
+    f: u64,
+}
+
 #[no_mangle]
-extern "C" fn demux_interrupt(source: InterruptSource, ty: InterruptType) {
+extern "C" fn demux_interrupt(
+    source: InterruptSource,
+    ty: InterruptType,
+    a: u64,
+    b: u64,
+    c: u64,
+    d: u64,
+    e: u64,
+    f: u64,
+) {
     println!("hello from interrupt handler");
     println!("source: {:?}, type: {:?}", source, ty);
-    loop {}
+    println!("args: {:?}, {:?}, {:?}, {:?}, {:?}, {:?}", a, b, c, d, e, f);
 }
