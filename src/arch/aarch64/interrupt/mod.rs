@@ -61,4 +61,9 @@ extern "C" fn demux_interrupt(
     println!("hello from interrupt handler");
     println!("source: {:?}, type: {:?}", source, ty);
     println!("args: {:?}, {:?}, {:?}, {:?}, {:?}, {:?}", a, b, c, d, e, f);
+    let elr: u64;
+    let esr: u64;
+    unsafe { asm!("mrs {0}, ELR_EL1; mrs {1}, ESR_EL1", out(reg) elr, out(reg) esr); }
+    println!("elr: {:#018X}", elr);
+    println!("esr: {:#018X}", esr);
 }

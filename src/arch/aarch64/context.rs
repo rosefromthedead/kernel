@@ -81,7 +81,8 @@ pub unsafe fn enter_context(ctx: &Context) -> Result<!, ()> {
 #[naked]
 pub unsafe fn very_good_context() {
     asm!("
-        mrs x0, CurrentEL
+        mov x2, #42
         svc #0
-    ");
+        b .
+    ", options(noreturn));
 }

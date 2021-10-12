@@ -174,7 +174,7 @@ unsafe fn init() {
 
     {
         let table = IntermediateTable::<Level0>::new_top_level();
-        table.map_to(VirtualAddress(0x0000_0000_9000_0000), KERNEL_LOAD_PHYS, 4096).unwrap();
+        table.map_to(VirtualAddress(0x0000_0000_9000_0000), KERNEL_LOAD_PHYS, 4096 * 512).unwrap();
         table.switch_el0_top_level();
         let par: u64;
         asm!("
