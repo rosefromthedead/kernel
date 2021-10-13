@@ -1,5 +1,6 @@
 use byteorder::{ByteOrder, BE};
 use cortex_a::interfaces::{Writeable, ReadWriteable};
+use tracing::info;
 
 use crate::arch::vm::{KERNEL_LOAD_PHYS, KERNEL_TABLE};
 use crate::println;
@@ -19,7 +20,7 @@ pub const FRAME_SIZE: usize = 4096;
 unsafe extern "C" fn early_init() {
     asm!("
         adrp x4, EARLY_STACK
-        add x4, x4, #0x1000
+        add x4, x4, #0x2000
         mov sp, x4
         b {0}
     ", sym init, options(noreturn));
@@ -171,19 +172,16 @@ unsafe fn init() {
     }
 
     KERNEL_TABLE.map_to(VirtualAddress(0xFFFF_FF00_0000_0000), PhysicalAddress(0x0000_0000_0900_0000), 4096).unwrap();
-    println!("Hello, universe!");
+    tracing::subscriber::set_global_default(crate::tracing::PutcharSubscriber::new()).unwrap();
+    let span = tracing::info_span!("kernel entry point");
+    let _guard = span.enter();
+    info!("Hello, universe!");
     interrupt::init_interrupts();
 
     {
         let table = IntermediateTable::<Level0>::new_top_level();
         table.map_to(VirtualAddress(0x0000_0000_9000_0000), KERNEL_LOAD_PHYS, 4096 * 512).unwrap();
         table.switch_el0_top_level();
-        let par: u64;
-        asm!("
-            at s1e0r, {0}
-            mrs {1}, PAR_EL1
-        ", in(reg) 0x0000_0000_9000_0000u64, lateout(reg) par);
-        println!("{:#018X}", par);
     }
 
     let virt = (context::very_good_context) as *const fn() as usize - 0xFFFF_0000_0000_0000 + 0x0000_0000_9000_0000;

@@ -20,7 +20,7 @@ pub static mut SPARE_FRAMES: [Page; 8] = [
 ];
 
 #[no_mangle]
-static mut EARLY_STACK: Page = Page([0; 4096]);
+static mut EARLY_STACK: [Page; 2] = [Page([0; 4096]), Page([0; 4096])];
 
 pub fn init_heap() {
     unsafe {

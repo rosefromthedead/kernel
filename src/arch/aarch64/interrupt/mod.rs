@@ -1,4 +1,5 @@
 use cortex_a::interfaces::Writeable;
+use tracing::{info, info_span};
 
 use crate::println;
 
@@ -58,12 +59,7 @@ extern "C" fn demux_interrupt(
     e: u64,
     f: u64,
 ) {
-    println!("hello from interrupt handler");
-    println!("source: {:?}, type: {:?}", source, ty);
-    println!("args: {:?}, {:?}, {:?}, {:?}, {:?}, {:?}", a, b, c, d, e, f);
-    let elr: u64;
-    let esr: u64;
-    unsafe { asm!("mrs {0}, ELR_EL1; mrs {1}, ESR_EL1", out(reg) elr, out(reg) esr); }
-    println!("elr: {:#018X}", elr);
-    println!("esr: {:#018X}", esr);
+    let span = info_span!("interrupt handler", src=?source, ?ty, a, b, c, d, e, f);
+    let _guard = span.enter();
+    info!(target: "interrupt handler", "hello from interrupt handler");
 }

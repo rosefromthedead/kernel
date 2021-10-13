@@ -18,6 +18,7 @@ mod console;
 mod context;
 mod memory;
 mod panic;
+mod tracing;
 mod vm;
 
 pub fn main() {

@@ -12,7 +12,6 @@ pub enum ContextState {
 
 impl Context {
     pub fn new(entry_virt: VirtualAddress) -> Self {
-        println!("{:#018X}", entry_virt.0);
         Context {
             state: ContextState::Suspended(ArchContext::new(entry_virt, VirtualAddress(0x0000_0000_8000_0000))),
         }
