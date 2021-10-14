@@ -51,6 +51,10 @@ impl PutcharSubscriber {
             current_span: AtomicU64::new(0),
         }
     }
+
+    fn get_current_span(&self) -> Option<span::Id> {
+        NonZeroU64::new(self.current_span.load(Relaxed)).map(span::Id::from_non_zero_u64)
+    }
 }
 
 impl Subscriber for PutcharSubscriber {
@@ -64,7 +68,8 @@ impl Subscriber for PutcharSubscriber {
         let span = Span {
             metadata: attrs.metadata(),
             fields: visitor.0,
-            parent: attrs.parent().cloned(),
+            parent: attrs.parent().cloned()
+                .or(self.get_current_span()),
         };
 
         let id = self.next.fetch_add(1, Relaxed);
@@ -87,25 +92,24 @@ impl Subscriber for PutcharSubscriber {
     fn event(&self, event: &tracing::Event<'_>) {
         let spans = self.spans.lock();
         let id = event.parent().cloned()
-            .or(NonZeroU64::new(self.current_span.load(Relaxed)).map(span::Id::from_non_zero_u64));
+            .or(self.get_current_span());
         match id {
             Some(id) => {
-                let span = spans.get(&id.into_u64()).unwrap();
-                let print_span = |span: &Span| {
+                fn print_span_with_parents(spans: &BTreeMap<u64, Span>, span: &Span) {
+                    if let Some(ref parent) = span.parent {
+                        let span = spans.get(&parent.into_u64()).unwrap();
+                        print_span_with_parents(spans, span);
+                    }
+
                     print!("in {} ", span.metadata.name());
                     for (name, value) in span.fields.iter() {
                         print!("{}={} ", name, value);
                     }
                     println!();
-                };
-                print_span(span);
-
-                let mut parent_id = id.clone();
-                while let Some(next) = spans.get(&parent_id.into_u64()).unwrap().parent.clone() {
-                    let span = spans.get(&next.into_u64()).unwrap();
-                    print_span(span);
-                    parent_id = next;
                 }
+
+                let span = spans.get(&id.into_u64()).unwrap();
+                print_span_with_parents(&spans, span);
 
                 print!("  \\ {}: {} ", event.metadata().level(), event.metadata().name().trim_start_matches("event "));
             },
