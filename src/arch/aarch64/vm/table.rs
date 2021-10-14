@@ -70,7 +70,6 @@ impl IntermediateLevel for Level2 {
 }
 
 #[repr(align(4096))]
-#[derive(Debug)]
 pub struct IntermediateTable<L: IntermediateLevel> {
     entries: [IntermediateTableEntry<L>; 512],
     // there will be between 0 and 512 of these, but I think this is good enough
@@ -158,7 +157,11 @@ impl<L: IntermediateLevel> IntermediateTable<L> {
         self.entries[idx] = IntermediateTableEntry::new_block(phys);
     }
 
-    pub fn entry_mut(&mut self, idx: usize) -> &mut IntermediateTableEntry<L> {
+    pub fn entry(&self, idx: usize) -> &IntermediateTableEntry<L> {
+        &self.entries[idx]
+    }
+
+    pub unsafe fn entry_mut(&mut self, idx: usize) -> &mut IntermediateTableEntry<L> {
         &mut self.entries[idx]
     }
 }
@@ -169,6 +172,16 @@ impl<L: IntermediateLevel> Default for IntermediateTable<L> {
             entries: [IntermediateTableEntry::new_invalid(); 512],
             _tables: PhantomData,
         }
+    }
+}
+
+impl<L: IntermediateLevel> Debug for IntermediateTable<L> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.debug_list()
+            .entries(self.entries.iter().enumerate()
+                .filter(|(_i, e)| e.is_valid())
+            )
+            .finish()
     }
 }
 
@@ -310,6 +323,13 @@ impl<L: IntermediateLevel> IntermediateTableEntry<L> {
         match self.is_block() {
             true => Some(PhysicalAddress((self.value & L::BLOCK_ADDRESS_MASK) as _)),
             false => None,
+        }
+    }
+
+    pub fn get_next_table(&self) -> Option<&L::Next> {
+        match self.table_address() {
+            Some(phys) => unsafe { Some(&*(phys_to_virt(phys).0 as *const _)) },
+            None => None,
         }
     }
 
@@ -469,7 +489,6 @@ impl<L: IntermediateLevel> PageOrBlockDesc for IntermediateTableEntry<L> {
 }
 
 #[repr(align(4096))]
-#[derive(Debug)]
 pub struct Level3Table {
     entries: [Level3TableEntry; 512],
 }
@@ -485,6 +504,12 @@ impl Default for Level3Table {
         Self {
             entries: [Level3TableEntry::new_invalid(); 512],
         }
+    }
+}
+
+impl Debug for Level3Table {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.debug_list().entries(self.entries.iter().enumerate().filter(|(i, e)| e.is_valid())).finish()
     }
 }
 
