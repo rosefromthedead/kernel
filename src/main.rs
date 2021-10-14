@@ -8,6 +8,7 @@
 #![feature(naked_functions)]
 #![feature(never_type)]
 #![feature(new_uninit)]
+#![feature(panic_info_message)]
 #![feature(ptr_as_uninit)]
 
 extern crate alloc;
