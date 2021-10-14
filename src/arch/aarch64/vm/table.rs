@@ -509,7 +509,7 @@ impl Default for Level3Table {
 
 impl Debug for Level3Table {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        f.debug_list().entries(self.entries.iter().enumerate().filter(|(i, e)| e.is_valid())).finish()
+        f.debug_list().entries(self.entries.iter().enumerate().filter(|(_i, e)| e.is_valid())).finish()
     }
 }
 

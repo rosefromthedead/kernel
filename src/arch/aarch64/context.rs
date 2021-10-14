@@ -27,10 +27,10 @@ impl ArchContext {
     }
 }
 
-pub unsafe fn enter_context(ctx: &Context) -> Result<!, ()> {
+pub unsafe fn enter_context(ctx: &Context) -> ! {
     let registers = match ctx.state {
         ContextState::Suspended(ref actx) => &actx.registers as *const _,
-        _ => return Err(()),
+        _ => panic!("tried to switch to non-suspended context"),
     };
     asm!("
         ldr x0, [x30, #248]
@@ -79,7 +79,7 @@ pub unsafe fn enter_context(ctx: &Context) -> Result<!, ()> {
 
 #[no_mangle]
 #[naked]
-pub unsafe fn very_good_context() {
+pub unsafe extern "C" fn very_good_context() {
     asm!("
         mov x2, #42
         svc #0

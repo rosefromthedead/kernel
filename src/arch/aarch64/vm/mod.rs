@@ -1,18 +1,10 @@
-use crate::vm::{PhysicalAddress, VirtualAddress};
+use crate::vm::PhysicalAddress;
 use table::{IntermediateTable, Level0, Level1, Level2};
 
 pub(super) mod table;
 
 pub(super) const KERNEL_OFFSET: usize = 0xFFFF_0000_0000_0000;
 pub(super) const KERNEL_LOAD_PHYS: PhysicalAddress = PhysicalAddress(0x4020_0000);
-
-pub type TopLevelTable = IntermediateTable<Level0>;
-
-impl TopLevelTable {
-    fn new_user(pid: usize) -> PhysicalAddress {
-        crate::memory::FRAME_ALLOCATOR.lock().alloc()       
-    }
-}
 
 #[no_mangle]
 pub static mut KERNEL_TABLE: IntermediateTable<Level0> = IntermediateTable::new();

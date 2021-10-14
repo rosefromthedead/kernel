@@ -4,8 +4,6 @@ pub mod virt;
 
 pub static mut WRITER: Writer = Writer(virt::virt_putchar);
 
-fn dummy_putchar(_: u8) {}
-
 pub struct Writer(pub fn(u8));
 
 impl Write for Writer {

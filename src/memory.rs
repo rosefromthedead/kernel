@@ -1,5 +1,5 @@
 use alloc::vec::Vec;
-use crate::{arch::FRAME_SIZE, vm::{PhysicalAddress, VirtualAddress}};
+use crate::{arch::FRAME_SIZE, vm::PhysicalAddress};
 use linked_list_allocator::LockedHeap;
 
 #[global_allocator]
@@ -86,7 +86,7 @@ impl FrameAllocator {
         phys
     }
 
-    pub fn alloc_range(&mut self, size: usize) -> (PhysicalAddress, usize) {
+    pub fn alloc_range(&mut self, size: usize) -> Chunk {
         let size = (size + FRAME_SIZE - 1) / FRAME_SIZE;
         let mut phys = None;
         let mut out_size = 0;
@@ -108,7 +108,10 @@ impl FrameAllocator {
             self.holes.remove(0);
         }
 
-        (PhysicalAddress(phys.unwrap()), out_size)
+        Chunk {
+            phys: PhysicalAddress(phys.unwrap()),
+            size: out_size,
+        }
     }
 
     pub fn dealloc(&mut self, phys: PhysicalAddress) {

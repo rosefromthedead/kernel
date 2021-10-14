@@ -3,7 +3,6 @@ use cortex_a::interfaces::{Writeable, ReadWriteable};
 use tracing::info;
 
 use crate::arch::vm::{KERNEL_LOAD_PHYS, KERNEL_TABLE};
-use crate::println;
 use crate::vm::{PhysicalAddress, VirtualAddress, Table};
 use vm::table::{IntermediateLevel, IntermediateTable, Level0, Level1, Level2};
 

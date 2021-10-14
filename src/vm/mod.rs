@@ -1,3 +1,5 @@
+use crate::memory::Chunk;
+
 #[derive(Copy, Clone, Debug)]
 pub struct PhysicalAddress(pub usize);
 
@@ -57,10 +59,10 @@ pub trait Table {
         self.unmap(virt, size);
         let mut frame_alloc = crate::memory::FRAME_ALLOCATOR.lock();
         while size > 0 {
-            let (chunk_phys, chunk_size) = frame_alloc.alloc_range(size);
+            let Chunk { phys: chunk_phys, size: chunk_size } = frame_alloc.alloc_range(size);
             size -= chunk_size;
             virt += chunk_size;
-            self.map_to(virt, chunk_phys, size);
+            self.map_to(virt, chunk_phys, size)?;
         }
         Ok(())
     }

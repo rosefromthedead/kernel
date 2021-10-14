@@ -1,8 +1,6 @@
 use cortex_a::interfaces::Writeable;
 use tracing::{info, info_span};
 
-use crate::println;
-
 // the first one in the table == base address of vector table
 extern "C" {
     fn current_el_sp_el0_sync();
