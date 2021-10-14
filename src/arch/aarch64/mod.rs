@@ -100,13 +100,15 @@ unsafe fn init() {
 
         let difference = vm::KERNEL_OFFSET - vm::KERNEL_LOAD_PHYS.0;
         asm!("
+            add sp, sp, {0}
+
             bl 1f
             1:
             add x30, x30, #(2f - 1b)
             add x30, x30, {0}
             br x30
             2:
-        ", in(reg) difference);
+        ", in(reg) difference, out("x30") _);
         // now that we're in the right place in memory, we can use cortex_a funcs
         TCR_EL1.write(TCR_EL1::EPD0::EnableTTBR0Walks
             + TCR_EL1::EPD1::EnableTTBR1Walks
