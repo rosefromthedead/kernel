@@ -77,11 +77,11 @@ pub struct IntermediateTable<L: IntermediateLevel> {
 }
 
 impl IntermediateTable<Level0> {
-    pub unsafe fn new_top_level() -> &'static mut Self {
+    pub fn new_top_level() -> &'static mut Self {
         let mut frame_allocator = crate::memory::FRAME_ALLOCATOR.lock();
         let table_phys = frame_allocator.alloc();
         let table_virt = phys_to_virt(table_phys);
-        &mut *(table_virt.0 as *mut Self)
+        unsafe { &mut *(table_virt.0 as *mut Self) }
     }
 
     pub unsafe fn get_current_el0_top_level() -> &'static mut Self {
@@ -90,12 +90,13 @@ impl IntermediateTable<Level0> {
         &mut *(self_phys as *mut Self)
     }
 
-    pub unsafe fn switch_el0_top_level(&mut self) {
-        let self_virt = self as *mut Self as usize;
+    pub unsafe fn switch_el0_top_level(&self) {
+        let self_virt = self as *const Self as usize;
         asm!("
             at s1e1r, {0}
             mrs {1}, PAR_EL1
             msr TTBR0_EL1, {1}
+            tlbi vmalle1
         ", in(reg) self_virt, lateout(reg) _);
     }
 }
@@ -494,6 +495,14 @@ pub struct Level3Table {
 }
 
 impl Level3Table {
+    pub fn entry(&self, idx: usize) -> &Level3TableEntry {
+        &self.entries[idx]
+    }
+
+    pub fn entry_mut(&mut self, idx: usize) -> &mut Level3TableEntry {
+        &mut self.entries[idx]
+    }
+
     pub fn get_frame_addr(&self, idx: usize) -> u64 {
         self.entries[idx].address()
     }
@@ -544,7 +553,7 @@ impl Table for Level3Table {
 }
 
 #[derive(Copy, Clone, Debug)]
-struct Level3TableEntry {
+pub struct Level3TableEntry {
     value: u64,
 }
 

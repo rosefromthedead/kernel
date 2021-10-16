@@ -1,6 +1,8 @@
 use crate::vm::PhysicalAddress;
 use table::{IntermediateTable, Level0, Level1, Level2};
 
+pub type TopLevelTable = IntermediateTable<Level0>;
+
 pub(super) mod table;
 
 pub(super) const KERNEL_OFFSET: usize = 0xFFFF_0000_0000_0000;

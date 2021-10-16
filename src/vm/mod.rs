@@ -1,4 +1,8 @@
+use tracing::info;
+
 use crate::memory::Chunk;
+
+pub use crate::arch::vm::TopLevelTable;
 
 #[derive(Copy, Clone, Debug)]
 pub struct PhysicalAddress(pub usize);
@@ -57,12 +61,15 @@ pub trait Table {
 
     fn alloc(&mut self, mut virt: VirtualAddress, mut size: usize) -> Result<(), ()> {
         self.unmap(virt, size);
-        let mut frame_alloc = crate::memory::FRAME_ALLOCATOR.lock();
+        size = (size + 4095) / 4096 * 4096;
         while size > 0 {
-            let Chunk { phys: chunk_phys, size: chunk_size } = frame_alloc.alloc_range(size);
+            let Chunk { phys: chunk_phys, size: chunk_size } = {
+                let mut frame_alloc = crate::memory::FRAME_ALLOCATOR.lock();
+                frame_alloc.alloc_range(size)
+            };
+            self.map_to(virt, chunk_phys, size)?;
             size -= chunk_size;
             virt += chunk_size;
-            self.map_to(virt, chunk_phys, size)?;
         }
         Ok(())
     }

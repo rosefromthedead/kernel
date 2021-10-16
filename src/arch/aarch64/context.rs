@@ -1,6 +1,6 @@
 use crate::{context::{Context, ContextState}, vm::VirtualAddress};
 
-pub struct ArchContext {
+pub struct CpuState {
     registers: Registers,
 }
 
@@ -13,21 +13,25 @@ struct Registers {
     spsr: u64,
 }
 
-impl ArchContext {
+impl CpuState {
     pub fn new(entry_point: VirtualAddress, stack: VirtualAddress) -> Self {
-        ArchContext {
+        CpuState {
             registers: Registers {
                 x: [0; 31],
                 sp: stack.0 as u64,
                 elr: entry_point.0 as u64,
-                // Very dangerous and bad please review
+                // TODO: Very dangerous and bad please review
                 spsr: 0,
             }
         }
     }
+
+    pub fn set_entry_point(&mut self, virt: VirtualAddress) {
+        self.registers.elr = virt.0 as u64;
+    }
 }
 
-pub unsafe fn enter_context(ctx: &Context) -> ! {
+pub unsafe fn jump_to_userspace(ctx: &Context) -> ! {
     let registers = match ctx.state {
         ContextState::Suspended(ref actx) => &actx.registers as *const _,
         _ => panic!("tried to switch to non-suspended context"),

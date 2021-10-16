@@ -13,6 +13,11 @@ pub mod vm;
 
 pub const FRAME_SIZE: usize = 4096;
 
+pub struct Arch {
+    device_tree: fdt::DeviceTree<'static>,
+    pub initrd: &'static [u8],
+}
+
 #[link_section = ".early_init"]
 #[no_mangle]
 #[naked]
@@ -76,7 +81,7 @@ unsafe fn init() {
         kernel_table.insert_raw(PhysicalAddress(kernel_remap_l1_addr), 0).unwrap();
         kernel_table.insert_raw(PhysicalAddress(direct_map_addr), 511).unwrap();
         kernel_remap_l1.insert_raw(PhysicalAddress(kernel_remap_l2_addr), 0).unwrap();
-        kernel_remap_l2.insert_block(vm::KERNEL_LOAD_PHYS, 0).unwrap();
+        kernel_remap_l2.insert_block(KERNEL_LOAD_PHYS, 0).unwrap();
         for i in 0..511 {
             let phys = PhysicalAddress(i * Level1::BLOCK_SIZE as usize);
             direct_map.insert_block(phys, i).unwrap();
@@ -129,45 +134,38 @@ unsafe fn init() {
 
     memory::init_heap();
 
+    let frames_ptr = &memory::SPARE_FRAMES as *const _;
+    let par: usize;
+    asm!("
+        at s1e1r, {0}
+        mrs {1}, PAR_EL1
+    ", in(reg) frames_ptr, lateout(reg) par);
+    let frames_phys = PhysicalAddress(par & 0x0000_FFFF_FFFF_F000);
+    crate::memory::FRAME_ALLOCATOR.lock().insert_hole(frames_phys, 4096 * 8);
+
+    vm::KERNEL_TABLE.map_to(VirtualAddress(0xFFFF_1000_0000_0000), dtb_phys, 4096).unwrap();
+    let dt_header_bytes = core::slice::from_raw_parts(0xFFFF_1000_0000_0000 as *const _, 40);
+    let dt_header = fdt::DeviceTreeHeader::new(&dt_header_bytes).unwrap();
+    let dtb_size = dt_header.total_size as usize;
+    vm::KERNEL_TABLE.unmap(VirtualAddress(0xFFFF_1000_0000_0000), 4096);
+    vm::KERNEL_TABLE.map_to(VirtualAddress(0xFFFF_1000_0000_0000), dtb_phys, dtb_size).unwrap();
+
+    let dtb = core::slice::from_raw_parts(0xFFFF_1000_0000_0000u64 as _, dtb_size);
+    let dt = fdt::DeviceTree::new(&dtb).unwrap();
+
+    let (memory, memory_cells) = dt.find_node("/memory").unwrap();
+    assert_eq!(memory_cells.address, 2);
+    assert_eq!(memory_cells.size, 2);
+    let reg = memory.properties().find(|prop| prop.name == "reg").unwrap();
+    let start_addr = PhysicalAddress(BE::read_u64(&reg.data[0..8]) as usize);
+    let size = BE::read_u64(&reg.data[8..16]) as usize;
     {
-        let frames_ptr = &memory::SPARE_FRAMES as *const _;
-        let par: usize;
-        asm!("
-            at s1e1r, {0}
-            mrs {1}, PAR_EL1
-        ", in(reg) frames_ptr, lateout(reg) par);
-        let frames_phys = PhysicalAddress(par & 0x0000_FFFF_FFFF_F000);
-        crate::memory::FRAME_ALLOCATOR.lock().insert_hole(frames_phys, 4096 * 8);
-
-        vm::KERNEL_TABLE.map_to(VirtualAddress(0xFFFF_1000_0000_0000), dtb_phys, 4096).unwrap();
-        let dt_header_bytes = core::slice::from_raw_parts(0xFFFF_1000_0000_0000 as *const _, 40);
-        let dt_header = fdt::DeviceTreeHeader::new(&dt_header_bytes).unwrap();
-        let dtb_size = dt_header.total_size as usize;
-        vm::KERNEL_TABLE.unmap(VirtualAddress(0xFFFF_1000_0000_0000), 4096);
-        vm::KERNEL_TABLE.map_to(VirtualAddress(0xFFFF_1000_0000_0000), dtb_phys, dtb_size).unwrap();
-
-        let dtb = core::slice::from_raw_parts(0xFFFF_1000_0000_0000u64 as _, dtb_size);
-        let dt = fdt::DeviceTree::new(&dtb).unwrap();
-
-        let root = dt.nodes().next().unwrap();
-        let address_cells = BE::read_u32(root.properties().find(|prop| prop.name == "#address-cells").unwrap().data);
-        let size_cells = BE::read_u32(root.properties().find(|prop| prop.name == "#size-cells").unwrap().data);
-        if address_cells != 2 || size_cells != 2 {
-            panic!();
-        }
-
-        let memory = dt.find_node("memory").unwrap();
-        let reg = memory.properties().find(|prop| prop.name == "reg").unwrap();
-        let start_addr = PhysicalAddress(BE::read_u64(&reg.data[0..8]) as usize);
-        let size = BE::read_u64(&reg.data[8..16]) as usize;
-        {
-            let mut frame_allocator = crate::memory::FRAME_ALLOCATOR.lock();
-            frame_allocator.insert_hole(start_addr, vm::KERNEL_LOAD_PHYS - start_addr);
-            let kernel_end = vm::KERNEL_LOAD_PHYS + 1024 * 1024 * 2;
-            frame_allocator.insert_hole(vm::KERNEL_LOAD_PHYS + 1024 * 1024 * 2, dtb_phys - kernel_end);
-            let dtb_end = dtb_phys + dtb_size;
-            frame_allocator.insert_hole(dtb_end, start_addr + size - dtb_end);
-        }
+        let mut frame_allocator = crate::memory::FRAME_ALLOCATOR.lock();
+        frame_allocator.insert_hole(start_addr, vm::KERNEL_LOAD_PHYS - start_addr);
+        let kernel_end = vm::KERNEL_LOAD_PHYS + 1024 * 1024 * 2;
+        frame_allocator.insert_hole(vm::KERNEL_LOAD_PHYS + 1024 * 1024 * 2, dtb_phys - kernel_end);
+        let dtb_end = dtb_phys + dtb_size;
+        frame_allocator.insert_hole(dtb_end, start_addr + size - dtb_end);
     }
 
     KERNEL_TABLE.map_to(VirtualAddress(0xFFFF_FF00_0000_0000), PhysicalAddress(0x0000_0000_0900_0000), 4096).unwrap();
@@ -177,14 +175,17 @@ unsafe fn init() {
     info!("Hello, universe!");
     interrupt::init_interrupts();
 
-    {
-        let table = IntermediateTable::<Level0>::new_top_level();
-        table.map_to(VirtualAddress(0x0000_0000_9000_0000), KERNEL_LOAD_PHYS, 4096 * 512).unwrap();
-        table.switch_el0_top_level();
-    }
+    let (chosen, _chosen_cells) = dt.find_node("/chosen").unwrap();
+    let initrd_start_prop = chosen.properties().find(|p| p.name == "linux,initrd-start").unwrap();
+    let initrd_end_prop = chosen.properties().find(|p| p.name == "linux,initrd-end").unwrap();
+    let initrd_start = BE::read_uint(initrd_start_prop.data, 4) as usize;
+    let initrd_end = BE::read_uint(initrd_end_prop.data, 4) as usize;
+    let initrd_size = initrd_end - initrd_start;
+    KERNEL_TABLE.map_to(VirtualAddress(0xFFFF_1000_4000_0000), PhysicalAddress(initrd_start), initrd_size).unwrap();
+    let initrd = core::slice::from_raw_parts(0xFFFF_1000_4000_0000 as *const u8, initrd_size as usize);
 
-    let virt = (context::very_good_context) as *const fn() as usize - 0xFFFF_0000_0000_0000 + 0x0000_0000_9000_0000;
-    let context = crate::context::Context::new(VirtualAddress(virt));
-    context.enter();
-    context::very_good_context();
+    crate::main(Arch {
+        device_tree: dt,
+        initrd,
+    });
 }
