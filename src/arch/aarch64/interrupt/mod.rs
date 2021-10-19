@@ -34,18 +34,6 @@ enum InterruptType {
     SError = 3,
 }
 
-#[allow(dead_code)]
-#[repr(C)]
-#[derive(Debug)]
-struct InterruptArgs {
-    a: u64,
-    b: u64,
-    c: u64,
-    d: u64,
-    e: u64,
-    f: u64,
-}
-
 #[no_mangle]
 extern "C" fn demux_interrupt(
     source: InterruptSource,
