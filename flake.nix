@@ -1,4 +1,5 @@
 {
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-21.11";
   inputs.flake-utils.url = "github:numtide/flake-utils";
   inputs.mkarm64image = {
     url = "github:rosehuds/mkarm64image";
