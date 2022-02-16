@@ -26,6 +26,10 @@ impl CpuState {
         }
     }
 
+    pub fn get_entry_point(&self) -> VirtualAddress {
+        VirtualAddress(self.registers.elr as usize)
+    }
+
     pub fn set_entry_point(&mut self, virt: VirtualAddress) {
         self.registers.elr = virt.0 as u64;
     }

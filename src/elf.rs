@@ -4,10 +4,11 @@ pub fn load_elf(file: &[u8], context: &mut Context) -> Result<(), goblin::error:
     let elf = goblin::elf::Elf::parse(file)?;
     for program_header in elf.program_headers {
         let vm_range = program_header.vm_range();
-
         if vm_range.start == 0 {
-            break;
+            continue;
         }
+
+        tracing::debug!(va = program_header.p_vaddr, size = program_header.p_memsz, "loading program header");
 
         let size = vm_range.end - vm_range.start;
         context.table.alloc(VirtualAddress(vm_range.start), size).unwrap();

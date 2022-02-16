@@ -10,6 +10,7 @@ pub mod context;
 pub mod interrupt;
 pub mod memory;
 pub mod vm;
+mod regs;
 
 pub const FRAME_SIZE: usize = 4096;
 
@@ -130,6 +131,9 @@ unsafe fn init() {
             + TCR_EL1::TBI1::Used
         + TCR_EL1::TG0::KiB_4
         + TCR_EL1::TG1::KiB_4);
+
+        MAIR_EL1.write(MAIR_EL1::Attr0_Normal_Inner::WriteBack_NonTransient_ReadWriteAlloc
+            + MAIR_EL1::Attr0_Normal_Outer::WriteBack_NonTransient_ReadWriteAlloc);
     }
 
     memory::init_heap();

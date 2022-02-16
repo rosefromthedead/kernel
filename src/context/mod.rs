@@ -1,4 +1,12 @@
-use crate::{arch::context::CpuState, vm::{TopLevelTable, VirtualAddress}};
+use core::{cell::Cell, sync::atomic::{AtomicUsize, Ordering}};
+
+use alloc::collections::BTreeMap;
+
+use crate::{arch::context::CpuState, vm::{Table, TopLevelTable, VirtualAddress}};
+
+// TODO: make it not static mut
+static mut CONTEXTS: BTreeMap<usize, Context> = BTreeMap::new();
+pub static CURRENT_CONTEXT: AtomicUsize = AtomicUsize::new(0);
 
 pub struct Context {
     pub state: ContextState,
@@ -13,9 +21,19 @@ pub enum ContextState {
 
 impl Context {
     pub fn new() -> Self {
+        let table = TopLevelTable::new_top_level();
+        let stack_pointer = VirtualAddress(0x0000_0000_8000_0000);
+        table.alloc(stack_pointer, 4096).unwrap();
         Context {
-            state: ContextState::Suspended(CpuState::new(VirtualAddress(0), VirtualAddress(0x0000_0000_8000_0000))),
-            table: TopLevelTable::new_top_level(),
+            state: ContextState::Suspended(CpuState::new(VirtualAddress(0), stack_pointer + 4096)),
+            table,
+        }
+    }
+
+    pub fn get_entry_point(&self) -> VirtualAddress {
+        match self.state {
+            ContextState::Suspended(ref state) => state.get_entry_point(),
+            _ => panic!("tried to get entry point on running or invalid process"),
         }
     }
 
@@ -32,5 +50,9 @@ impl Context {
 
     pub unsafe fn jump_to_userspace(&self) {
         crate::arch::context::jump_to_userspace(&self);
+    }
+
+    pub unsafe fn get_current() -> &'static Self {
+        CONTEXTS.get(&CURRENT_CONTEXT.load(Ordering::Relaxed)).unwrap()
     }
 }

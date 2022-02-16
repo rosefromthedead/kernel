@@ -4,6 +4,7 @@ use table::{IntermediateTable, Level0, Level1, Level2};
 pub type TopLevelTable = IntermediateTable<Level0>;
 
 pub(super) mod table;
+mod fmt;
 
 pub(super) const KERNEL_OFFSET: usize = 0xFFFF_0000_0000_0000;
 pub(super) const KERNEL_LOAD_PHYS: PhysicalAddress = PhysicalAddress(0x4020_0000);

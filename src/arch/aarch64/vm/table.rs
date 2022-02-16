@@ -2,6 +2,8 @@ use crate::vm::{PhysicalAddress, VirtualAddress, Table};
 use alloc::boxed::Box;
 use core::{fmt::{Debug, Formatter}, marker::PhantomData};
 
+use super::fmt::{debug_page_or_block, ForceUpperHex};
+
 macro_rules! set_bit {
     ($value:expr, $bit:expr, $bool:expr) => {
         match $bool {
@@ -97,6 +99,7 @@ impl IntermediateTable<Level0> {
             mrs {1}, PAR_EL1
             msr TTBR0_EL1, {1}
             tlbi vmalle1
+            isb
         ", in(reg) self_virt, lateout(reg) _);
     }
 }
@@ -140,7 +143,6 @@ impl<L: IntermediateLevel> IntermediateTable<L> {
         phys &= 0x0000_FFFF_FFFF_F000;
 
         let mut entry = IntermediateTableEntry::new(PhysicalAddress(phys as usize));
-        entry.set_owned(owned);
         self.entries[idx] = entry;
     }
 
@@ -176,13 +178,45 @@ impl<L: IntermediateLevel> Default for IntermediateTable<L> {
     }
 }
 
-impl<L: IntermediateLevel> Debug for IntermediateTable<L> {
+impl Debug for IntermediateTable<Level0> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        f.debug_list()
-            .entries(self.entries.iter().enumerate()
-                .filter(|(_i, e)| e.is_valid())
-            )
-            .finish()
+        for (i, entry) in self.entries.iter().enumerate().filter(|(_i, e)| e.is_valid()) {
+            f.write_fmt(format_args!("{} {:#018x}:\n", i, entry.value))?;
+            if let Some(next) = entry.get_next_table() {
+                f.write_fmt(format_args!("{:?}", next))?;
+            } else {
+                panic!("level 0 entry must be invalid or table");
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Debug for IntermediateTable<Level1> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        for (i, entry) in self.entries.iter().enumerate().filter(|(_i, e)| e.is_valid()) {
+            f.write_fmt(format_args!("  {} {:#018x}:\n", i, entry.value))?;
+            if let Some(next) = entry.get_next_table() {
+                f.write_fmt(format_args!("{:?}", next))?;
+            } else {
+                debug_page_or_block(entry, f)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Debug for IntermediateTable<Level2> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        for (i, entry) in self.entries.iter().enumerate().filter(|(_i, e)| e.is_valid()) {
+            f.write_fmt(format_args!("    {} {:#018x}:\n", i, entry.value))?;
+            if let Some(next) = entry.get_next_table() {
+                f.write_fmt(format_args!("{:?}", next))?;
+            } else {
+                debug_page_or_block(entry, f)?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -220,7 +254,10 @@ impl<L: IntermediateLevel> Table for IntermediateTable<L> {
             }
         }
         if L::IS_TOP_LEVEL {
-            unsafe { asm!("dsb ishst"); }
+            unsafe { asm!("
+                dsb ishst
+                isb
+            "); }
         }
         Ok(())
     }
@@ -262,10 +299,16 @@ impl<L: IntermediateLevel> Debug for IntermediateTableEntry<L> {
             return write!(f, "{:?}", Option::<()>::None);
         }
         if let Some(table) = self.table_address() {
-            return f.debug_tuple("Table").field(unsafe { &*(phys_to_virt(table).0 as *const L::Next) }).finish()
+            return f.debug_tuple("Table")
+                .field(&ForceUpperHex(self.value))
+                .field(unsafe { &*(phys_to_virt(table).0 as *const L::Next) })
+                .finish()
         }
         if let Some(block) = self.block_address() {
-            return f.debug_tuple("Block").field(&block).finish()
+            return f.debug_tuple("Block")
+                .field(&ForceUpperHex(self.value))
+                .field(&block)
+                .finish()
         }
         unreachable!()
     }
@@ -391,19 +434,19 @@ pub trait PageOrBlockDesc {
     fn value_mut(&mut self) -> &mut u64;
 
     // Upper
-    fn get_block_xn(&self) -> bool {
+    fn get_xn(&self) -> bool {
         self.value() & (1 << 54) != 0
     }
 
-    fn set_block_xn(&mut self, value: bool) {
+    fn set_xn(&mut self, value: bool) {
         set_bit!(self.value_mut(), 54, value);
     }
 
-    fn get_block_pxn(&self) -> bool {
+    fn get_pxn(&self) -> bool {
         self.value() & (1 << 53) != 0
     }
 
-    fn set_block_pxn(&mut self, value: bool) {
+    fn set_pxn(&mut self, value: bool) {
         set_bit!(self.value_mut(), 53, value);
     }
 
@@ -440,6 +483,12 @@ pub trait PageOrBlockDesc {
         set_bit!(self.value_mut(), 55, value);
     }
 
+    // Output address
+    fn get_address(&self) -> u64 {
+        // bits [47:12]
+        self.value() & 0x0000_FFFF_FFFF_F000
+    }
+
     // Lower
     fn get_nt(&self) -> bool {
         self.value() & (1 << 16) != 0
@@ -466,7 +515,22 @@ pub trait PageOrBlockDesc {
     }
 
     //TODO: shareable bits
-    //TODO: access permissions bits
+
+    fn get_read_only(&self) -> bool {
+        self.value() & (1 << 7) != 0
+    }
+
+    fn set_read_only(&mut self, value: bool) {
+        set_bit!(self.value_mut(), 7, value);
+    }
+
+    fn get_el0_accessible(&self) -> bool {
+        self.value() & (1 << 6) != 0
+    }
+
+    fn set_el0_accessible(&mut self, value: bool) {
+        set_bit!(self.value_mut(), 6, value);
+    }
 
     fn get_non_secure(&self) -> bool {
         self.value() & (1 << 5) != 0
@@ -479,7 +543,17 @@ pub trait PageOrBlockDesc {
     //TODO: attrindex
 }
 
-impl<L: IntermediateLevel> PageOrBlockDesc for IntermediateTableEntry<L> {
+impl PageOrBlockDesc for IntermediateTableEntry<Level1> {
+    fn value(&self) -> &u64 {
+        &self.value
+    }
+
+    fn value_mut(&mut self) -> &mut u64 {
+        &mut self.value
+    }
+}
+
+impl PageOrBlockDesc for IntermediateTableEntry<Level2> {
     fn value(&self) -> &u64 {
         &self.value
     }
@@ -518,7 +592,10 @@ impl Default for Level3Table {
 
 impl Debug for Level3Table {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        f.debug_list().entries(self.entries.iter().enumerate().filter(|(_i, e)| e.is_valid())).finish()
+        for (i, entry) in self.entries.iter().enumerate().filter(|(_i, e)| e.is_valid()) {
+            f.write_fmt(format_args!("      {} {:#018x}: {:?}\n", i, entry.value, entry))?;
+        }
+        Ok(())
     }
 }
 
@@ -552,15 +629,21 @@ impl Table for Level3Table {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub struct Level3TableEntry {
     value: u64,
+}
+
+impl Debug for Level3TableEntry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        debug_page_or_block(self, f)
+    }
 }
 
 impl Level3TableEntry {
     const fn new(phys: PhysicalAddress) -> Self {
         let phys = phys.0 as u64 & 0x0000_FFFF_FFFF_F000;
-        let value = phys | 0b11 | (1 << 10) | (1 << 2) | (1 << 6);
+        let mut value = phys | 0b11 | (1 << 2) | (1 << 10) | (1 << 6);
         Self { value }
     }
 

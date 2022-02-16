@@ -45,7 +45,21 @@ extern "C" fn demux_interrupt(
     e: u64,
     f: u64,
 ) {
-    let span = info_span!("interrupt handler", src=?source, ?ty, a, b, c, d, e, f);
+    let link: u64;
+    unsafe { asm!("
+        mrs {0}, ELR_EL1
+    ", out(reg) link) };
+    let syndrome = super::regs::ExceptionSyndrome::get();
+    let span = info_span!("interrupt handler", src=?source, ?ty, a, b, c, d, e, f, ?syndrome, link);
     let _guard = span.enter();
     info!(target: "interrupt handler", "hello from interrupt handler");
+    match a {
+        0 => {
+            // print
+            let message_bytes = unsafe { core::slice::from_raw_parts(e as *const _, f as usize) };
+            let message: &str = core::str::from_utf8(message_bytes).unwrap();
+            crate::interrupt::print(message);
+        },
+        _ => panic!("invalid interrupt number {}", a),
+    }
 }
