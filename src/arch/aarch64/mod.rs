@@ -3,6 +3,7 @@ use cortex_a::interfaces::{Writeable, ReadWriteable};
 use tracing::info;
 
 use crate::arch::vm::{KERNEL_LOAD_PHYS, KERNEL_TABLE};
+use crate::memory::KERNEL_HEAP_ALLOCATOR;
 use crate::vm::{PhysicalAddress, VirtualAddress, Table};
 use vm::table::{IntermediateLevel, IntermediateTable, Level0, Level1, Level2};
 
@@ -136,7 +137,7 @@ unsafe fn init() {
             + MAIR_EL1::Attr0_Normal_Outer::WriteBack_NonTransient_ReadWriteAlloc);
     }
 
-    memory::init_heap();
+    memory::init_early_heap(&mut KERNEL_TABLE);
 
     let frames_ptr = &memory::SPARE_FRAMES as *const _;
     let par: usize;
@@ -187,6 +188,8 @@ unsafe fn init() {
     let initrd_size = initrd_end - initrd_start;
     KERNEL_TABLE.map_to(VirtualAddress(0xFFFF_1000_4000_0000), PhysicalAddress(initrd_start), initrd_size).unwrap();
     let initrd = core::slice::from_raw_parts(0xFFFF_1000_4000_0000 as *const u8, initrd_size as usize);
+
+    memory::init_main_heap(&mut KERNEL_TABLE);
 
     crate::main(Arch {
         device_tree: dt,

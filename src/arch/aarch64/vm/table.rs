@@ -377,7 +377,7 @@ impl<L: IntermediateLevel> IntermediateTableEntry<L> {
         }
     }
 
-    fn get_next_table_mut(&mut self) -> Option<&mut L::Next> {
+    pub fn get_next_table_mut(&mut self) -> Option<&mut L::Next> {
         match self.table_address() {
             Some(phys) => unsafe { Some(&mut *(phys_to_virt(phys).0 as *mut _)) },
             None => None,
