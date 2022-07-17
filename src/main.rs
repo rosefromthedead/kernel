@@ -34,12 +34,14 @@ pub fn main(arch: arch::Arch) {
     let mut init_ctx = context::Context::new();
     unsafe { init_ctx.enter(); }
 
+    /*
     let par: u64;
     unsafe { asm!("
             at s1e0r, {0}
             mrs {1}, PAR_EL1
         ", in(reg) 0x80000000u64, lateout(reg) par) };
     ::tracing::debug!(par, "stack");
+    */
 
     elf::load_elf(arch.initrd, &mut init_ctx).unwrap();
 

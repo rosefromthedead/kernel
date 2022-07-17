@@ -1,6 +1,8 @@
 use cortex_a::interfaces::Writeable;
 use tracing::{info, info_span};
 
+use crate::arch::aarch64::regs::ExceptionClass;
+
 // the first one in the table == base address of vector table
 extern "C" {
     fn current_el_sp_el0_sync();
@@ -53,13 +55,19 @@ extern "C" fn demux_interrupt(
     let span = info_span!("interrupt handler", src=?source, ?ty, a, b, c, d, e, f, ?syndrome, link);
     let _guard = span.enter();
     info!(target: "interrupt handler", "hello from interrupt handler");
-    match a {
+    if syndrome.cause != ExceptionClass::SvcAa64 {
+        panic!("unknown interrupt cause");
+    }
+    match syndrome.iss {
         0 => {
+            unsafe { crate::context::Context::exit() };
+        },
+        1 => {
             // print
             let message_bytes = unsafe { core::slice::from_raw_parts(e as *const _, f as usize) };
             let message: &str = core::str::from_utf8(message_bytes).unwrap();
             crate::interrupt::print(message);
         },
-        _ => panic!("invalid interrupt number {}", a),
+        n => panic!("invalid interrupt number {}", n),
     }
 }

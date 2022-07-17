@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ExceptionClass {
     Unknown,
     SimdOrFpTrapped,
@@ -24,6 +24,7 @@ pub struct ExceptionSyndrome {
     /// if false, 16-bit instruction faulted, otherwise 32-bit instruction or N/A
     pub instr_len: bool,
     pub cause: ExceptionClass,
+    pub iss: u32,
 }
 
 impl ExceptionSyndrome {
@@ -51,10 +52,12 @@ impl ExceptionSyndrome {
             0b110101 => ExceptionClass::WatchpointSameEl,
             _ => ExceptionClass::Unknown,
         };
+        let iss = (esr & 0x00FF_FFFF) as u32;
 
         ExceptionSyndrome {
             instr_len,
             cause,
+            iss,
         }
     }
 }

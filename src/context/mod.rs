@@ -55,4 +55,11 @@ impl Context {
     pub unsafe fn get_current() -> &'static Self {
         CONTEXTS.get(&CURRENT_CONTEXT.load(Ordering::Relaxed)).unwrap()
     }
+
+    pub unsafe fn exit() {
+        // TODO: race condition??
+        if CURRENT_CONTEXT.load(Ordering::Relaxed) == 0 {
+            crate::arch::platform::shutdown();
+        }
+    }
 }

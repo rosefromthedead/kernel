@@ -1,9 +1,11 @@
+use alloc::string::String;
 use byteorder::{ByteOrder, BE};
 use cortex_a::interfaces::{Writeable, ReadWriteable};
 use tracing::info;
 
 use crate::arch::vm::{KERNEL_LOAD_PHYS, KERNEL_TABLE};
 use crate::memory::KERNEL_HEAP_ALLOCATOR;
+use crate::println;
 use crate::vm::{PhysicalAddress, VirtualAddress, Table};
 use vm::table::{IntermediateLevel, IntermediateTable, Level0, Level1, Level2};
 
@@ -12,6 +14,7 @@ pub mod interrupt;
 pub mod memory;
 pub mod vm;
 mod regs;
+pub mod platform;
 
 pub const FRAME_SIZE: usize = 4096;
 
@@ -191,6 +194,40 @@ unsafe fn init() {
 
     memory::init_main_heap(&mut KERNEL_TABLE);
 
+    /*
+        let mut node_path = String::from("/");
+        let mut last_parents = 0;
+        let trim_node_names = |s: &mut String, n| {
+            for _ in 0..n {
+                s.pop();
+                'inner: loop {
+                    if s.ends_with('/') || s == "" {
+                        break 'inner;
+                    } else {
+                        s.pop();
+                    }
+                }
+            }
+        };
+        for node in dt.nodes() {
+            let depth_diff = node.parents as i8 - last_parents;
+            last_parents = node.parents as i8;
+
+            match depth_diff {
+                x if x <= 0 => {
+                    trim_node_names(&mut node_path, -x + 1);
+                }
+                1 => {}
+                _ => panic!("fdt parser: sudden gain of parents"),
+            }
+            node_path.push_str(node.name);
+            node_path.push('/');
+            println!("{}, {}", node_path, node.offset);
+            for prop in node.properties() {
+                println!("\t{}: {:?}", prop.name, prop.data);
+            }
+        }
+    */
     crate::main(Arch {
         device_tree: dt,
         initrd,
