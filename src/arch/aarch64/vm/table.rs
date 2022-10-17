@@ -74,8 +74,7 @@ impl IntermediateLevel for Level2 {
 #[repr(align(4096))]
 pub struct IntermediateTable<L: IntermediateLevel> {
     entries: [IntermediateTableEntry<L>; 512],
-    // there will be between 0 and 512 of these, but I think this is good enough
-    _tables: PhantomData<L::Next>,
+    _tables: PhantomData<[Option<L::Next>; 512]>,
 }
 
 impl IntermediateTable<Level0> {
