@@ -1,3 +1,5 @@
+// TODO: add PAR_EL1 reg
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum ExceptionClass {
     Unknown,
