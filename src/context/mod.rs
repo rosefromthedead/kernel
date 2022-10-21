@@ -2,7 +2,7 @@ use core::{cell::Cell, sync::atomic::{AtomicUsize, Ordering}, marker::PhantomDat
 
 use alloc::{collections::BTreeMap, boxed::Box};
 
-use crate::{arch::{self, context::CpuState}, vm::{Table, TopLevelTable, VirtualAddress, PhysicalAddress}};
+use crate::{arch::{self, context::CpuState, vm::KERNEL_TABLE}, vm::{Table, TopLevelTable, VirtualAddress, PhysicalAddress}};
 
 // TODO: make it not static mut
 static mut CONTEXTS: BTreeMap<usize, ContextEntry> = BTreeMap::new();
@@ -32,10 +32,9 @@ pub struct SuspendedContext {
 
 impl SuspendedContext {
     pub fn new() -> Self {
-        let stack_pointer = VirtualAddress(0x0000_0000_8000_0000);
         let table = crate::memory::FRAME_ALLOCATOR.lock().alloc();
         SuspendedContext {
-            user_state: CpuState::new(VirtualAddress(0), stack_pointer + 4096),
+            user_state: CpuState::new(),
             table,
         }
     }
@@ -63,7 +62,12 @@ pub struct ActiveContext {
 
 impl ActiveContext {
     pub fn init(&mut self) {
-        todo!("alloc stack and set sp");
+        let table_phys = arch::vm::get_current_user_table();
+        arch::vm::init_user_table(table_phys);
+        let table = self.table();
+        let sp = VirtualAddress(0x0000_0000_7FFF_F000);
+        table.alloc(sp, 4096).unwrap();
+        self.user_state.set_stack_pointer(sp + 4096);
     }
 
     pub fn table(&mut self) -> &mut TopLevelTable {

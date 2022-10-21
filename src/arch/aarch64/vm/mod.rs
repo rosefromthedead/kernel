@@ -1,4 +1,6 @@
-use crate::vm::{PhysicalAddress, VirtualAddress};
+use core::mem::MaybeUninit;
+
+use crate::vm::{PhysicalAddress, Table, VirtualAddress};
 use table::{IntermediateTable, Level0, Level1, Level2};
 
 pub type TopLevelTable = IntermediateTable<Level0>;
@@ -13,6 +15,30 @@ pub unsafe fn switch_table(phys: PhysicalAddress) {
     ", in(reg) phys.0);
 }
 
+pub fn init_user_table(phys: PhysicalAddress) {
+    unsafe {
+        KERNEL_TABLE.map_to(USER_TABLE_SCRATCH, phys, 4096).unwrap();
+        let new_table_uninit = &mut *(USER_TABLE_SCRATCH.0 as *mut MaybeUninit<TopLevelTable>);
+        let init: &mut TopLevelTable = Table::clear(new_table_uninit);
+        // recursive mapping!
+        init.insert_raw(phys, 511).unwrap();
+        asm!("
+            tlbi vmalle1
+            isb
+        ");
+    }
+}
+
+pub fn get_current_user_table() -> PhysicalAddress {
+    let table_phys: usize;
+    unsafe {
+        asm!("
+            mrs {0}, TTBR0_EL1
+        ", out(reg) table_phys);
+    }
+    PhysicalAddress(table_phys & 0x0000_FFFF_FFFF_FFFE)
+}
+
 pub(super) mod table;
 mod fmt;
 
@@ -20,6 +46,7 @@ pub(super) const KERNEL_OFFSET: usize = 0xFFFF_0000_0000_0000;
 pub(super) const KERNEL_LOAD_PHYS: PhysicalAddress = PhysicalAddress(0x4020_0000);
 pub(super) const KERNEL_HEAP_START: VirtualAddress = VirtualAddress(0xFFFF_1000_8000_0000);
 pub const USER_TABLE: VirtualAddress = VirtualAddress(0x0000_FFFF_FFFF_F000);
+const USER_TABLE_SCRATCH: VirtualAddress = VirtualAddress(0xFFFF_0000_1000_0000);
 
 #[no_mangle]
 pub static mut KERNEL_TABLE: IntermediateTable<Level0> = IntermediateTable::new();

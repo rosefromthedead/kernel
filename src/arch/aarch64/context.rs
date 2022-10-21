@@ -14,12 +14,12 @@ struct Registers {
 }
 
 impl CpuState {
-    pub fn new(entry_point: VirtualAddress, stack: VirtualAddress) -> Self {
+    pub fn new() -> Self {
         CpuState {
             registers: Registers {
                 x: [0; 31],
-                sp: stack.0 as u64,
-                elr: entry_point.0 as u64,
+                sp: 0,
+                elr: 0,
                 // TODO: Very dangerous and bad please review
                 spsr: 0,
             }
@@ -32,6 +32,10 @@ impl CpuState {
 
     pub fn set_entry_point(&mut self, virt: VirtualAddress) {
         self.registers.elr = virt.0 as u64;
+    }
+
+    pub fn set_stack_pointer(&mut self, virt: VirtualAddress) {
+        self.registers.sp = virt.0 as u64;
     }
 }
 
