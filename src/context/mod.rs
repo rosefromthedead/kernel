@@ -79,6 +79,6 @@ impl ActiveContext {
     }
 
     pub fn jump_to_userspace(&mut self) {
-        todo!("jump to userspace");
+        unsafe { arch::context::jump_to_userspace(self); }
     }
 }
