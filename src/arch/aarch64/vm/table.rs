@@ -350,14 +350,14 @@ impl<L: IntermediateLevel> IntermediateTableEntry<L> {
         }
     }
 
-    pub fn get_next_table(&self) -> Option<&L::Next> {
+    pub(in crate::arch::aarch64) fn get_next_table(&self) -> Option<&L::Next> {
         match self.table_address() {
             Some(phys) => unsafe { Some(&*(phys_to_virt(phys).0 as *const _)) },
             None => None,
         }
     }
 
-    pub fn get_next_table_mut(&mut self) -> Option<&mut L::Next> {
+    pub(in crate::arch::aarch64) fn get_next_table_mut(&mut self) -> Option<&mut L::Next> {
         match self.table_address() {
             Some(phys) => unsafe { Some(&mut *(phys_to_virt(phys).0 as *mut _)) },
             None => None,
@@ -549,15 +549,15 @@ pub struct Level3Table {
 }
 
 impl Level3Table {
-    pub fn entry(&self, idx: usize) -> &Level3TableEntry {
+    fn entry(&self, idx: usize) -> &Level3TableEntry {
         &self.entries[idx]
     }
 
-    pub fn entry_mut(&mut self, idx: usize) -> &mut Level3TableEntry {
+    fn entry_mut(&mut self, idx: usize) -> &mut Level3TableEntry {
         &mut self.entries[idx]
     }
 
-    pub fn get_frame_addr(&self, idx: usize) -> u64 {
+    fn get_frame_addr(&self, idx: usize) -> u64 {
         self.entries[idx].address()
     }
 }
