@@ -1,6 +1,6 @@
 use crate::vm::{PhysicalAddress, VirtualAddress, Table};
 use alloc::boxed::Box;
-use core::{fmt::{Debug, Formatter}, marker::PhantomData};
+use core::{fmt::{Debug, Formatter}, marker::PhantomData, mem::MaybeUninit};
 
 use super::fmt::{debug_page_or_block, ForceUpperHex};
 
@@ -219,9 +219,8 @@ impl<L: IntermediateLevel> Table for IntermediateTable<L> {
                 None => {
                     let frame_phys = crate::memory::FRAME_ALLOCATOR.lock().alloc();
                     unsafe { self.insert_raw(frame_phys, idx)?; }
-                    // `next_table` here is uninitialised. do not do anything before clearing it
-                    let next_table = self.entries[idx].get_next_table_mut().unwrap();
-                    next_table.clear();
+                    let next_table_uninit = unsafe { &mut *(phys_to_virt(frame_phys).0 as *mut MaybeUninit<L::Next>) };
+                    let next_table: &mut L::Next = Table::clear(next_table_uninit);
                     next_table.map_to(new_virt, new_phys, new_size)?;
                 },
             }
@@ -253,9 +252,17 @@ impl<L: IntermediateLevel> Table for IntermediateTable<L> {
         }
     }
 
-    fn clear(&mut self) {
-        for entry in self.entries.iter_mut() {
-            *entry = IntermediateTableEntry::new_invalid();
+    fn clear<'a>(this: &'a mut MaybeUninit<Self>) -> &'a mut Self {
+        unsafe {
+            // why even bother writing rust at this point
+            let this_inner = core::mem::transmute::<
+                _,
+                &mut [MaybeUninit<u64>; 512],
+            >(&mut *this);
+            for entry in this_inner.iter_mut() {
+                entry.write(0);
+            }
+            this.assume_init_mut()
         }
     }
 }
@@ -595,15 +602,24 @@ impl Table for Level3Table {
         }
     }
 
-    fn clear(&mut self) {
-        for entry in self.entries.iter_mut() {
-            *entry = Level3TableEntry::new_invalid();
+    fn clear<'a>(this: &'a mut MaybeUninit<Self>) -> &'a mut Self {
+        unsafe {
+            // why even bother writing rust at this point
+            let this_inner = core::mem::transmute::<
+                _,
+                &mut [MaybeUninit<u64>; 512],
+            >(&mut *this);
+            for entry in this_inner.iter_mut() {
+                entry.write(0);
+            }
+            this.assume_init_mut()
         }
     }
 }
 
 #[derive(Copy, Clone)]
-pub struct Level3TableEntry {
+#[repr(transparent)]
+struct Level3TableEntry {
     value: u64,
 }
 

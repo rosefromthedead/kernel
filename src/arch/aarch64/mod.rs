@@ -1,3 +1,5 @@
+use core::mem::MaybeUninit;
+
 use alloc::string::String;
 use byteorder::{ByteOrder, BE};
 use cortex_a::interfaces::{Writeable, ReadWriteable};
@@ -69,19 +71,19 @@ unsafe fn init() {
             out(reg) kernel_remap_l2_addr, out(reg) direct_map_addr,
             out(reg) kernel_identity_l0_addr, out(reg) kernel_identity_l1_addr
         );
-        let kernel_table = &mut *(kernel_table_addr as *mut IntermediateTable<Level0>);
-        let kernel_remap_l1 = &mut *(kernel_remap_l1_addr as *mut IntermediateTable<Level1>);
-        let kernel_remap_l2 = &mut *(kernel_remap_l2_addr as *mut IntermediateTable<Level2>);
-        let direct_map = &mut *(direct_map_addr as *mut IntermediateTable<Level1>);
-        let kernel_identity_l0 = &mut *(kernel_identity_l0_addr as *mut IntermediateTable<Level0>);
-        let kernel_identity_l1 = &mut *(kernel_identity_l1_addr as *mut IntermediateTable<Level1>);
+        let kernel_table = &mut *(kernel_table_addr as *mut MaybeUninit<_>);
+        let kernel_remap_l1 = &mut *(kernel_remap_l1_addr as *mut MaybeUninit<_>);
+        let kernel_remap_l2 = &mut *(kernel_remap_l2_addr as *mut MaybeUninit<_>);
+        let direct_map = &mut *(direct_map_addr as *mut MaybeUninit<_>);
+        let kernel_identity_l0 = &mut *(kernel_identity_l0_addr as *mut MaybeUninit<_>);
+        let kernel_identity_l1 = &mut *(kernel_identity_l1_addr as *mut MaybeUninit<_>);
 
-        kernel_table.clear();
-        kernel_remap_l1.clear();
-        kernel_remap_l2.clear();
-        direct_map.clear();
-        kernel_identity_l0.clear();
-        kernel_identity_l1.clear();
+        let kernel_table: &mut IntermediateTable<Level0> = Table::clear(kernel_table);
+        let kernel_remap_l1: &mut IntermediateTable<Level1> = Table::clear(kernel_remap_l1);
+        let kernel_remap_l2: &mut IntermediateTable<Level2> = Table::clear(kernel_remap_l2);
+        let direct_map: &mut IntermediateTable<Level1> = Table::clear(direct_map);
+        let kernel_identity_l0: &mut IntermediateTable<Level0> = Table::clear(kernel_identity_l0);
+        let kernel_identity_l1: &mut IntermediateTable<Level1> = Table::clear(kernel_identity_l1);
 
         kernel_table.insert_raw(PhysicalAddress(kernel_remap_l1_addr), 0).unwrap();
         kernel_table.insert_raw(PhysicalAddress(direct_map_addr), 511).unwrap();

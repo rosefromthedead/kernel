@@ -1,3 +1,5 @@
+use core::mem::MaybeUninit;
+
 use tracing::info;
 
 use crate::memory::Chunk;
@@ -44,7 +46,7 @@ impl core::ops::Sub<VirtualAddress> for VirtualAddress {
     }
 }
 
-pub trait Table {
+pub trait Table: Sized {
     /// Returns Err(()) and doesn't map anything if any virtual address in this range is already
     /// mapped
     //TODO: remove result, add return value to unmap(), call unmap() to check at all call sites
@@ -57,7 +59,7 @@ pub trait Table {
 
     fn unmap(&mut self, virt: VirtualAddress, size: usize);
 
-    fn clear(&mut self);
+    fn clear<'a>(this: &'a mut MaybeUninit<Self>) -> &'a mut Self;
 
     fn alloc(&mut self, mut virt: VirtualAddress, mut size: usize) -> Result<(), ()> {
         self.unmap(virt, size);
