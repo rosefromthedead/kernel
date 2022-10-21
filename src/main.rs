@@ -12,6 +12,7 @@
 #![feature(panic_info_message)]
 #![feature(ptr_as_uninit)]
 
+use alloc::boxed::Box;
 use ::tracing::info_span;
 
 extern crate alloc;
@@ -31,8 +32,9 @@ pub fn main(arch: arch::Arch) {
     let span = info_span!("kernel main");
     let _guard = span.enter();
 
-    let mut init_ctx = context::Context::new();
-    unsafe { init_ctx.enter(); }
+    let mut init_ctx = Box::new(context::SuspendedContext::new());
+    let mut active_ctx = init_ctx.enter();
+    active_ctx.init();
 
     /*
     let par: u64;
@@ -43,18 +45,16 @@ pub fn main(arch: arch::Arch) {
     ::tracing::debug!(par, "stack");
     */
 
-    elf::load_elf(arch.initrd, &mut init_ctx).unwrap();
+    elf::load_elf(arch.initrd, &mut active_ctx).unwrap();
 
     let par: u64;
     unsafe { asm!("
             at s1e0r, {0}
             mrs {1}, PAR_EL1
-        ", in(reg) init_ctx.get_entry_point().0, lateout(reg) par) };
+        ", in(reg) active_ctx.user_state.get_entry_point().0, lateout(reg) par) };
     ::tracing::debug!(par, "text or something");
 
-    println!("{:#?}", init_ctx.table);
-
-    unsafe { init_ctx.jump_to_userspace(); }
+    unsafe { active_ctx.jump_to_userspace(); }
 
     panic!("end of main");
 }

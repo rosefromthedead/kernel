@@ -1,59 +1,52 @@
-use core::{cell::Cell, sync::atomic::{AtomicUsize, Ordering}};
+use core::{cell::Cell, sync::atomic::{AtomicUsize, Ordering}, marker::PhantomData};
 
-use alloc::collections::BTreeMap;
+use alloc::{collections::BTreeMap, boxed::Box};
 
-use crate::{arch::context::CpuState, vm::{Table, TopLevelTable, VirtualAddress}};
+use crate::{arch::{self, context::CpuState}, vm::{Table, TopLevelTable, VirtualAddress, PhysicalAddress}};
 
 // TODO: make it not static mut
-static mut CONTEXTS: BTreeMap<usize, Context> = BTreeMap::new();
+static mut CONTEXTS: BTreeMap<usize, ContextEntry> = BTreeMap::new();
 pub static CURRENT_CONTEXT: AtomicUsize = AtomicUsize::new(0);
 
-pub struct Context {
-    pub state: ContextState,
-    pub table: &'static mut TopLevelTable,
+enum ContextEntry {
+    /// The context is not currently active on any CPU
+    Suspended(Box<SuspendedContext>),
+    /// The context is active on some CPU and cannot be accessed
+    Active,
 }
 
-pub enum ContextState {
-    Running,
-    Suspended(CpuState),
-    Invalid,
+impl ContextEntry {
+    pub fn take(&mut self) -> Option<Box<SuspendedContext>> {
+        let entry = core::mem::replace(self, ContextEntry::Active);
+        match entry {
+            ContextEntry::Suspended(ctx) => Some(ctx),
+            _ => None,
+        }
+    }
 }
 
-impl Context {
+pub struct SuspendedContext {
+    user_state: CpuState,
+    table: PhysicalAddress,
+}
+
+impl SuspendedContext {
     pub fn new() -> Self {
-        let table = TopLevelTable::new_top_level();
         let stack_pointer = VirtualAddress(0x0000_0000_8000_0000);
-        table.alloc(stack_pointer, 4096).unwrap();
-        Context {
-            state: ContextState::Suspended(CpuState::new(VirtualAddress(0), stack_pointer + 4096)),
+        let table = crate::memory::FRAME_ALLOCATOR.lock().alloc();
+        SuspendedContext {
+            user_state: CpuState::new(VirtualAddress(0), stack_pointer + 4096),
             table,
         }
     }
 
-    pub fn get_entry_point(&self) -> VirtualAddress {
-        match self.state {
-            ContextState::Suspended(ref state) => state.get_entry_point(),
-            _ => panic!("tried to get entry point on running or invalid process"),
+    pub fn enter(self: Box<Self>) -> ActiveContext {
+        // TODO: save old context
+        let SuspendedContext { user_state, table } = *self;
+        unsafe { arch::vm::switch_table(table) };
+        ActiveContext {
+            user_state,
         }
-    }
-
-    pub fn set_entry_point(&mut self, virt: VirtualAddress) {
-        match self.state {
-            ContextState::Suspended(ref mut state) => state.set_entry_point(virt),
-            _ => panic!("tried to set entry point on running or invalid process"),
-        }
-    }
-
-    pub unsafe fn enter(&self) {
-        self.table.switch_el0_top_level();
-    }
-
-    pub unsafe fn jump_to_userspace(&self) {
-        crate::arch::context::jump_to_userspace(&self);
-    }
-
-    pub unsafe fn get_current() -> &'static Self {
-        CONTEXTS.get(&CURRENT_CONTEXT.load(Ordering::Relaxed)).unwrap()
     }
 
     pub unsafe fn exit() {
@@ -61,5 +54,27 @@ impl Context {
         if CURRENT_CONTEXT.load(Ordering::Relaxed) == 0 {
             crate::arch::platform::shutdown();
         }
+    }
+}
+
+pub struct ActiveContext {
+    pub user_state: CpuState,
+}
+
+impl ActiveContext {
+    pub fn init(&mut self) {
+        todo!("alloc stack and set sp");
+    }
+
+    pub fn table(&mut self) -> &mut TopLevelTable {
+        unsafe { &mut *(arch::vm::USER_TABLE.0 as *mut _) }
+    }
+
+    pub fn user_state(&self) -> &CpuState {
+        &self.user_state
+    }
+
+    pub fn jump_to_userspace(&mut self) {
+        todo!("jump to userspace");
     }
 }

@@ -1,4 +1,4 @@
-use crate::{context::{Context, ContextState}, vm::VirtualAddress};
+use crate::{vm::VirtualAddress, context::ActiveContext};
 
 pub struct CpuState {
     registers: Registers,
@@ -35,11 +35,8 @@ impl CpuState {
     }
 }
 
-pub unsafe fn jump_to_userspace(ctx: &Context) -> ! {
-    let registers = match ctx.state {
-        ContextState::Suspended(ref actx) => &actx.registers as *const _,
-        _ => panic!("tried to switch to non-suspended context"),
-    };
+pub unsafe fn jump_to_userspace(ctx: &ActiveContext) -> ! {
+    let registers = &ctx.user_state.registers as *const _;
     asm!("
         ldr x0, [x30, #248]
         ldr x1, [x30, #256]
