@@ -3,7 +3,7 @@ use crate::{context::ActiveContext, vm::{Table, VirtualAddress}};
 pub fn load_elf(file: &[u8], context: &mut ActiveContext) -> Result<(), goblin::error::Error> {
     let elf = goblin::elf::Elf::parse(file)?;
     let table = context.table();
-    for program_header in elf.program_headers {
+    for program_header in elf.program_headers.iter().filter(|h| h.p_type == 1) {
         let vm_range = program_header.vm_range();
         if vm_range.start == 0 {
             continue;
