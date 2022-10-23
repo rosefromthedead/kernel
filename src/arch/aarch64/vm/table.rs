@@ -200,14 +200,11 @@ impl<L: IntermediateLevel> Table for IntermediateTable<L> {
         phys: PhysicalAddress,
         size: usize,
     ) -> Result<(), ()> {
-        let starting_idx = ((virt.0 as u64 >> L::VIRT_SHIFT_AMT) & 0x1FF) as usize;
+        let start_idx = ((virt.0 as u64 >> L::VIRT_SHIFT_AMT) & 0x1FF) as usize;
         let block_size = L::BLOCK_SIZE as usize;
-        let mut entries_needed = (size + block_size - 1) / block_size;
-        if starting_idx + entries_needed > 512 {
-            entries_needed = 512 - starting_idx;
-        }
+        let entries_needed = core::cmp::min((size + block_size - 1) / block_size, 512 - start_idx);
         for i in 0..entries_needed {
-            let idx = i + starting_idx;
+            let idx = i + start_idx;
             let entry = &mut self.entries[idx];
             let new_virt = VirtualAddress(virt.0 + i * L::BLOCK_SIZE as usize);
             let new_phys = PhysicalAddress(phys.0 + i * L::BLOCK_SIZE as usize);
@@ -582,7 +579,7 @@ impl Debug for Level3Table {
 impl Table for Level3Table {
     fn map_to(&mut self, virt: VirtualAddress, phys: PhysicalAddress, size: usize) -> Result<(), ()> {
         let start_idx = virt.0 >> 12 & 0x1FF;
-        let entries_needed = (size + 4095) / 4096;
+        let entries_needed = core::cmp::min((size + 4095) / 4096, 512 - start_idx);
         for i in start_idx..start_idx + entries_needed {
             let entry = &mut self.entries[i];
             let new_phys = PhysicalAddress(phys.0 + i * 4096);
