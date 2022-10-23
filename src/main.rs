@@ -32,27 +32,11 @@ pub fn main(arch: arch::Arch) {
     let span = info_span!("kernel main");
     let _guard = span.enter();
 
-    let mut init_ctx = Box::new(context::SuspendedContext::new());
+    let init_ctx = Box::new(context::SuspendedContext::new());
     let mut active_ctx = init_ctx.enter();
     active_ctx.init();
 
-    /*
-    let par: u64;
-    unsafe { asm!("
-            at s1e0r, {0}
-            mrs {1}, PAR_EL1
-        ", in(reg) 0x80000000u64, lateout(reg) par) };
-    ::tracing::debug!(par, "stack");
-    */
-
     elf::load_elf(arch.initrd, &mut active_ctx).unwrap();
-
-    let par: u64;
-    unsafe { asm!("
-            at s1e0r, {0}
-            mrs {1}, PAR_EL1
-        ", in(reg) active_ctx.user_state.get_entry_point().0, lateout(reg) par) };
-    ::tracing::debug!(par, "text or something");
 
     unsafe { active_ctx.jump_to_userspace(); }
 
