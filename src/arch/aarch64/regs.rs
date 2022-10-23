@@ -19,6 +19,7 @@ pub enum ExceptionClass {
     SoftwareStepSameEl,
     WatchpointLowerEl,
     WatchpointSameEl,
+    Other(u8),
 }
 
 #[derive(Debug)]
@@ -34,8 +35,9 @@ impl ExceptionSyndrome {
         let esr: u64;
         unsafe { asm!("mrs {0}, ESR_EL1", out(reg) esr) };
         let instr_len = ((esr >> 25) & 1) == 1;
-        let class_bits = esr >> 26 & 0b0011_1111;
+        let class_bits = (esr >> 26 & 0b0011_1111) as u8;
         let cause = match class_bits {
+            0b000000 => ExceptionClass::Unknown,
             0b000111 => ExceptionClass::SimdOrFpTrapped,
             0b001110 => ExceptionClass::IllegalExecutionState,
             0b010101 => ExceptionClass::SvcAa64,
@@ -52,7 +54,7 @@ impl ExceptionSyndrome {
             0b110011 => ExceptionClass::SoftwareStepSameEl,
             0b110100 => ExceptionClass::WatchpointLowerEl,
             0b110101 => ExceptionClass::WatchpointSameEl,
-            _ => ExceptionClass::Unknown,
+            x => ExceptionClass::Other(x),
         };
         let iss = (esr & 0x00FF_FFFF) as u32;
 
