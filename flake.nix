@@ -8,14 +8,14 @@
   outputs = { self, nixpkgs, flake-utils, mkarm64image }: flake-utils.lib.eachDefaultSystem (system:
     let
       pkgs = nixpkgs.legacyPackages.${system};
-      triple = (nixpkgs.lib.systems.elaborate system).config;
+      build-triple = (nixpkgs.lib.systems.elaborate system).config;
+      channel = (nixpkgs.lib.trivial.importTOML ./rust-toolchain.toml).toolchain.channel;
     in
       {
         devShell = pkgs.pkgsCross.aarch64-multiplatform.mkShell {
-          depsBuildBuild = with pkgs; [ cacert rustup gcc gdb mkarm64image.packages.${system}.mkarm64image qemu ];
+          depsBuildBuild = with pkgs; [ cacert rustup gdb mkarm64image.packages.${system}.mkarm64image qemu ];
           shellHook = ''
-            rustup component add rust-src rust-analyzer-preview
-            export PATH=$PATH:~/.rustup/toolchains/${pkgs.lib.readFile ./rust-toolchain}-${triple}/bin/
+            export PATH=$PATH:~/.rustup/toolchains/${channel}-${build-triple}/bin/
           '';
         };
       }
