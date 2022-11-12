@@ -33,7 +33,7 @@ pub fn init_early_heap(table: &mut IntermediateTable<Level0>) {
         let heap_phys: usize;
         let map_frames_virt = &mut HEAP_MAP_FRAMES as *mut _ as usize;
         let map_frames_phys: usize;
-        asm!("
+        core::arch::asm!("
             at s1e1r, {0}
             mrs {1}, PAR_EL1
             at s1e1r, {2}

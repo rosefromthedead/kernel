@@ -1,3 +1,4 @@
+use core::arch::asm;
 use core::mem::MaybeUninit;
 
 use crate::vm::{PhysicalAddress, Table, VirtualAddress};

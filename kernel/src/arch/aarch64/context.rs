@@ -1,3 +1,5 @@
+use core::arch::asm;
+
 use crate::{vm::VirtualAddress, context::ActiveContext};
 
 pub struct CpuState {

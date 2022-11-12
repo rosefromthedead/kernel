@@ -1,8 +1,9 @@
+use core::arch::asm;
 use core::mem::MaybeUninit;
 
 use alloc::string::String;
 use byteorder::{ByteOrder, BE};
-use cortex_a::interfaces::{Writeable, ReadWriteable};
+use aarch64_cpu::{Writeable, ReadWriteable};
 use tracing::info;
 
 use crate::arch::vm::{KERNEL_LOAD_PHYS, KERNEL_TABLE};
@@ -46,14 +47,14 @@ unsafe fn init() {
 
     // Initiailise system registers
     {
-        use cortex_a::registers::*;
+        use aarch64_cpu::registers::*;
         // Don't trap on FP/SIMD register access
-        CPACR_EL1.write(CPACR_EL1::TTA::None + CPACR_EL1::FPEN::None + CPACR_EL1::ZEN::None);
+        CPACR_EL1.write(CPACR_EL1::TTA::NoTrap + CPACR_EL1::FPEN::TrapNothing + CPACR_EL1::ZEN::TrapNothing);
     }
 
     // Initialise MMU + translation tables
     {
-        use cortex_a::registers::*;
+        use aarch64_cpu::registers::*;
         let kernel_table_addr: usize;
         let kernel_remap_l1_addr: usize;
         let kernel_remap_l2_addr: usize;
@@ -121,7 +122,7 @@ unsafe fn init() {
             br x30
             2:
         ", in(reg) difference, out("x30") _);
-        // now that we're in the right place in memory, we can use cortex_a funcs
+        // now that we're in the right place in memory, we can use aarch64_cpu funcs
         TCR_EL1.write(TCR_EL1::EPD0::EnableTTBR0Walks
             + TCR_EL1::EPD1::EnableTTBR1Walks
             + TCR_EL1::IPS::Bits_48
@@ -144,12 +145,12 @@ unsafe fn init() {
 
     memory::init_early_heap(&mut KERNEL_TABLE);
 
-    let frames_ptr = &memory::SPARE_FRAMES as *const _;
+    let frames_virt = &memory::SPARE_FRAMES as *const _ as usize;
     let par: usize;
     asm!("
         at s1e1r, {0}
         mrs {1}, PAR_EL1
-    ", in(reg) frames_ptr, lateout(reg) par);
+    ", in(reg) frames_virt, lateout(reg) par);
     let frames_phys = PhysicalAddress(par & 0x0000_FFFF_FFFF_F000);
     crate::memory::FRAME_ALLOCATOR.lock().insert_hole(frames_phys, 4096 * 8);
 

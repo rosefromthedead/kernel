@@ -1,6 +1,6 @@
 use crate::vm::{PhysicalAddress, VirtualAddress, Table};
 use alloc::boxed::Box;
-use core::{fmt::{Debug, Formatter}, marker::PhantomData, mem::MaybeUninit};
+use core::{arch::asm, fmt::{Debug, Formatter}, marker::PhantomData, mem::MaybeUninit};
 
 use super::fmt::{debug_page_or_block, ForceUpperHex};
 

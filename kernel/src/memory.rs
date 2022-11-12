@@ -11,7 +11,7 @@ pub static FRAME_ALLOCATOR: spin::Mutex<FrameAllocator> = spin::Mutex::new(Frame
 pub fn alloc_error_handler(_: core::alloc::Layout) -> ! {
     loop {
         unsafe {
-            asm!("wfi");
+            core::arch::asm!("wfi");
         }
     }
 }

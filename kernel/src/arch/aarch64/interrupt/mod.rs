@@ -1,4 +1,4 @@
-use cortex_a::interfaces::Writeable;
+use aarch64_cpu::Writeable;
 use tracing::{info, info_span};
 
 use crate::arch::aarch64::regs::ExceptionClass;
@@ -9,7 +9,7 @@ extern "C" {
 }
 
 pub fn init_interrupts() {
-    use cortex_a::registers::VBAR_EL1;
+    use aarch64_cpu::registers::VBAR_EL1;
     VBAR_EL1.set(current_el_sp_el0_sync as *const fn() as u64);
 }
 
@@ -48,7 +48,7 @@ extern "C" fn demux_interrupt(
     f: u64,
 ) {
     let link: u64;
-    unsafe { asm!("
+    unsafe { core::arch::asm!("
         mrs {0}, ELR_EL1
     ", out(reg) link) };
     let syndrome = super::regs::ExceptionSyndrome::get();

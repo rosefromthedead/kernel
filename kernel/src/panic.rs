@@ -19,6 +19,6 @@ pub extern "C" fn rust_begin_unwind(info: &core::panic::PanicInfo) -> ! {
     }
 
     loop {
-        unsafe { asm!("wfi"); }
+        unsafe { core::arch::asm!("wfi"); }
     }
 }

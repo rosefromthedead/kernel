@@ -33,7 +33,7 @@ pub struct ExceptionSyndrome {
 impl ExceptionSyndrome {
     pub fn get() -> Self {
         let esr: u64;
-        unsafe { asm!("mrs {0}, ESR_EL1", out(reg) esr) };
+        unsafe { core::arch::asm!("mrs {0}, ESR_EL1", out(reg) esr) };
         let instr_len = ((esr >> 25) & 1) == 1;
         let class_bits = (esr >> 26 & 0b0011_1111) as u8;
         let cause = match class_bits {
