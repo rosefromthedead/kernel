@@ -1,7 +1,10 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, env::var};
 
 fn main() {
-    let target_triple = std::env::var("TARGET").unwrap();
+    if var("CARGO_FEATURE_BUILD_ASM").as_deref() != Ok("1") {
+        return;
+    }
+    let target_triple = var("TARGET").unwrap();
     let target_arch = target_triple.split_once("-").unwrap().0;
     println!("cargo:rerun-if-changed=src/arch/{}/asm", target_arch);
 
