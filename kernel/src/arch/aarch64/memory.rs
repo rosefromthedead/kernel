@@ -1,6 +1,6 @@
 use linked_list_allocator::Heap;
 
-use crate::{vm::{PhysicalAddress, Table}, arch::vm::table::{IntermediateLevel, Level1, Level2}};
+use crate::{vm::{PhysicalAddress, Table}, arch::vm::table::{IntermediateLevel, Level1, Level2}, memory::KERNEL_HEAP_ALLOCATOR};
 
 use super::vm::{table::{IntermediateTable, Level0}, KERNEL_HEAP_START};
 
@@ -57,12 +57,12 @@ pub fn init_early_heap(table: &mut IntermediateTable<Level0>) {
         level3.map_to(KERNEL_HEAP_START, heap_phys, 4096);
 
         // weird initialisation behaviour
-        crate::memory::KERNEL_HEAP_ALLOCATOR.force_unlock();
-        *crate::memory::KERNEL_HEAP_ALLOCATOR.lock() = Heap::new(KERNEL_HEAP_START.0, 4096);
+        KERNEL_HEAP_ALLOCATOR.force_unlock();
+        *KERNEL_HEAP_ALLOCATOR.lock() = Heap::new(KERNEL_HEAP_START.0 as *mut u8, 4096);
     }
 }
 
 pub fn init_main_heap(table: &mut IntermediateTable<Level0>) {
     table.alloc(KERNEL_HEAP_START + 4096, 1048576 - 4096).unwrap();
-    unsafe { crate::memory::KERNEL_HEAP_ALLOCATOR.lock().extend(1048576 - 4096) };
+    unsafe { KERNEL_HEAP_ALLOCATOR.lock().extend(1048576 - 4096) };
 }
