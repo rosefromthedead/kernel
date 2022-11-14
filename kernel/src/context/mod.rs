@@ -1,8 +1,8 @@
-use core::{cell::Cell, sync::atomic::{AtomicUsize, Ordering}, marker::PhantomData};
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 use alloc::{collections::BTreeMap, boxed::Box};
 
-use crate::{arch::{self, context::CpuState, vm::KERNEL_TABLE}, vm::{Table, TopLevelTable, VirtualAddress, PhysicalAddress}};
+use crate::{arch::{self, context::CpuState}, vm::{Table, TopLevelTable, VirtualAddress, PhysicalAddress}};
 
 // TODO: make it not static mut
 static mut CONTEXTS: BTreeMap<usize, ContextEntry> = BTreeMap::new();

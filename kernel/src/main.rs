@@ -1,11 +1,7 @@
 #![no_std]
 #![no_main]
 #![feature(alloc_error_handler)]
-#![feature(asm)]
-#![feature(const_btree_new)]
-#![feature(const_fn_trait_bound)]
 #![feature(lang_items)]
-#![feature(maybe_uninit_extra)]
 #![feature(naked_functions)]
 #![feature(never_type)]
 #![feature(new_uninit)]
@@ -38,7 +34,7 @@ pub fn main(arch: arch::Arch) {
 
     elf::load_elf(arch.initrd, &mut active_ctx).unwrap();
 
-    unsafe { active_ctx.jump_to_userspace(); }
+    active_ctx.jump_to_userspace();
 
     panic!("end of main");
 }

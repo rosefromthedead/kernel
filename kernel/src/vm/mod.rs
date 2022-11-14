@@ -1,7 +1,5 @@
 use core::mem::MaybeUninit;
 
-use tracing::info;
-
 use crate::memory::Chunk;
 
 pub use crate::arch::vm::TopLevelTable;

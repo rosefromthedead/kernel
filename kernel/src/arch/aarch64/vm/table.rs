@@ -115,7 +115,7 @@ impl<L: IntermediateLevel> IntermediateTable<L> {
         // assert_eq!(phys & 0xFFF, 0);
         phys &= 0x0000_FFFF_FFFF_F000;
 
-        let mut entry = IntermediateTableEntry::new(PhysicalAddress(phys as usize));
+        let entry = IntermediateTableEntry::new(PhysicalAddress(phys as usize));
         self.entries[idx] = entry;
     }
 
@@ -298,7 +298,7 @@ impl<L: IntermediateLevel> IntermediateTableEntry<L> {
 
     fn new(phys: PhysicalAddress) -> Self {
         let phys = phys.0 as u64 & 0x0000_FFFF_FFFF_F000;
-        let mut value = phys | 0b11 | (1 << 2) | (1 << 10) | (1 << 6);
+        let value = phys | 0b11 | (1 << 2) | (1 << 10) | (1 << 6);
         Self {
             value,
             _marker: PhantomData,
@@ -629,7 +629,7 @@ impl Debug for Level3TableEntry {
 impl Level3TableEntry {
     const fn new(phys: PhysicalAddress) -> Self {
         let phys = phys.0 as u64 & 0x0000_FFFF_FFFF_F000;
-        let mut value = phys | 0b11 | (1 << 2) | (1 << 10) | (1 << 6);
+        let value = phys | 0b11 | (1 << 2) | (1 << 10) | (1 << 6);
         Self { value }
     }
 
