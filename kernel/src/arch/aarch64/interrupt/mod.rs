@@ -60,8 +60,7 @@ extern "C" fn demux_interrupt(
     }
     match syndrome.iss {
         0 => {
-            // unsafe { crate::context::Context::exit() };
-            todo!()
+            unsafe { crate::context::exit() };
         },
         1 => {
             // print

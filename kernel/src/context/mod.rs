@@ -47,13 +47,6 @@ impl SuspendedContext {
             user_state,
         }
     }
-
-    pub unsafe fn exit() {
-        // TODO: race condition??
-        if CURRENT_CONTEXT.load(Ordering::Relaxed) == 0 {
-            crate::arch::platform::shutdown();
-        }
-    }
 }
 
 pub struct ActiveContext {
@@ -80,5 +73,11 @@ impl ActiveContext {
 
     pub fn jump_to_userspace(&mut self) {
         unsafe { arch::context::jump_to_userspace(self); }
+    }
+}
+
+pub fn exit() {
+    if CURRENT_CONTEXT.load(Ordering::Relaxed) == 0 {
+        crate::arch::platform::shutdown();
     }
 }
