@@ -1,20 +1,20 @@
 use core::arch::asm;
 use core::mem::MaybeUninit;
 
+use aarch64_cpu::{ReadWriteable, Writeable};
 use byteorder::{ByteOrder, BE};
-use aarch64_cpu::{Writeable, ReadWriteable};
 use tracing::info;
 
 use crate::arch::vm::{KERNEL_LOAD_PHYS, KERNEL_TABLE};
-use crate::vm::{PhysicalAddress, VirtualAddress, Table};
+use crate::vm::{PhysicalAddress, Table, VirtualAddress};
 use vm::table::{IntermediateLevel, IntermediateTable, Level0, Level1, Level2};
 
 pub mod context;
 pub mod interrupt;
 pub mod memory;
-pub mod vm;
-mod regs;
 pub mod platform;
+mod regs;
+pub mod vm;
 
 pub const FRAME_SIZE: usize = 4096;
 
@@ -46,7 +46,9 @@ unsafe fn init() {
     {
         use aarch64_cpu::registers::*;
         // Don't trap on FP/SIMD register access
-        CPACR_EL1.write(CPACR_EL1::TTA::NoTrap + CPACR_EL1::FPEN::TrapNothing + CPACR_EL1::ZEN::TrapNothing);
+        CPACR_EL1.write(
+            CPACR_EL1::TTA::NoTrap + CPACR_EL1::FPEN::TrapNothing + CPACR_EL1::ZEN::TrapNothing,
+        );
     }
 
     // Initialise MMU + translation tables
@@ -83,15 +85,23 @@ unsafe fn init() {
         let kernel_identity_l0: &mut IntermediateTable<Level0> = Table::clear(kernel_identity_l0);
         let kernel_identity_l1: &mut IntermediateTable<Level1> = Table::clear(kernel_identity_l1);
 
-        kernel_table.insert_raw(PhysicalAddress(kernel_remap_l1_addr), 0).unwrap();
-        kernel_table.insert_raw(PhysicalAddress(direct_map_addr), 511).unwrap();
-        kernel_remap_l1.insert_raw(PhysicalAddress(kernel_remap_l2_addr), 0).unwrap();
+        kernel_table
+            .insert_raw(PhysicalAddress(kernel_remap_l1_addr), 0)
+            .unwrap();
+        kernel_table
+            .insert_raw(PhysicalAddress(direct_map_addr), 511)
+            .unwrap();
+        kernel_remap_l1
+            .insert_raw(PhysicalAddress(kernel_remap_l2_addr), 0)
+            .unwrap();
         kernel_remap_l2.insert_block(KERNEL_LOAD_PHYS, 0).unwrap();
         for i in 0..511 {
             let phys = PhysicalAddress(i * Level1::BLOCK_SIZE as usize);
             direct_map.insert_block(phys, i).unwrap();
         }
-        kernel_identity_l0.insert_raw(PhysicalAddress(kernel_identity_l1_addr), 0).unwrap();
+        kernel_identity_l0
+            .insert_raw(PhysicalAddress(kernel_identity_l1_addr), 0)
+            .unwrap();
         for i in 0..511 {
             let phys = PhysicalAddress(i * Level1::BLOCK_SIZE as usize);
             kernel_identity_l1.insert_block(phys, i).unwrap();
@@ -120,24 +130,28 @@ unsafe fn init() {
             2:
         ", in(reg) difference, out("x30") _);
         // now that we're in the right place in memory, we can use aarch64_cpu funcs
-        TCR_EL1.write(TCR_EL1::EPD0::EnableTTBR0Walks
-            + TCR_EL1::EPD1::EnableTTBR1Walks
-            + TCR_EL1::IPS::Bits_48
-            + TCR_EL1::IRGN0::NonCacheable
-            + TCR_EL1::IRGN1::NonCacheable
-            + TCR_EL1::ORGN0::NonCacheable
-            + TCR_EL1::ORGN1::NonCacheable
-            + TCR_EL1::SH0::None
-            + TCR_EL1::SH1::None
-            + TCR_EL1::T0SZ.val(16)
-            + TCR_EL1::T1SZ.val(16)
-            + TCR_EL1::TBI0::Used
-            + TCR_EL1::TBI1::Used
-        + TCR_EL1::TG0::KiB_4
-        + TCR_EL1::TG1::KiB_4);
+        TCR_EL1.write(
+            TCR_EL1::EPD0::EnableTTBR0Walks
+                + TCR_EL1::EPD1::EnableTTBR1Walks
+                + TCR_EL1::IPS::Bits_48
+                + TCR_EL1::IRGN0::NonCacheable
+                + TCR_EL1::IRGN1::NonCacheable
+                + TCR_EL1::ORGN0::NonCacheable
+                + TCR_EL1::ORGN1::NonCacheable
+                + TCR_EL1::SH0::None
+                + TCR_EL1::SH1::None
+                + TCR_EL1::T0SZ.val(16)
+                + TCR_EL1::T1SZ.val(16)
+                + TCR_EL1::TBI0::Used
+                + TCR_EL1::TBI1::Used
+                + TCR_EL1::TG0::KiB_4
+                + TCR_EL1::TG1::KiB_4,
+        );
 
-        MAIR_EL1.write(MAIR_EL1::Attr0_Normal_Inner::WriteBack_NonTransient_ReadWriteAlloc
-            + MAIR_EL1::Attr0_Normal_Outer::WriteBack_NonTransient_ReadWriteAlloc);
+        MAIR_EL1.write(
+            MAIR_EL1::Attr0_Normal_Inner::WriteBack_NonTransient_ReadWriteAlloc
+                + MAIR_EL1::Attr0_Normal_Outer::WriteBack_NonTransient_ReadWriteAlloc,
+        );
     }
 
     memory::init_early_heap(&mut KERNEL_TABLE);
@@ -149,14 +163,20 @@ unsafe fn init() {
         mrs {1}, PAR_EL1
     ", in(reg) frames_virt, lateout(reg) par);
     let frames_phys = PhysicalAddress(par & 0x0000_FFFF_FFFF_F000);
-    crate::memory::FRAME_ALLOCATOR.lock().insert_hole(frames_phys, 4096 * 8);
+    crate::memory::FRAME_ALLOCATOR
+        .lock()
+        .insert_hole(frames_phys, 4096 * 8);
 
-    vm::KERNEL_TABLE.map_to(VirtualAddress(0xFFFF_1000_0000_0000), dtb_phys, 4096).unwrap();
+    vm::KERNEL_TABLE
+        .map_to(VirtualAddress(0xFFFF_1000_0000_0000), dtb_phys, 4096)
+        .unwrap();
     let dt_header_bytes = core::slice::from_raw_parts(0xFFFF_1000_0000_0000 as *const _, 40);
     let dt_header = fdt::DeviceTreeHeader::new(&dt_header_bytes).unwrap();
     let dtb_size = dt_header.total_size as usize;
     vm::KERNEL_TABLE.unmap(VirtualAddress(0xFFFF_1000_0000_0000), 4096);
-    vm::KERNEL_TABLE.map_to(VirtualAddress(0xFFFF_1000_0000_0000), dtb_phys, dtb_size).unwrap();
+    vm::KERNEL_TABLE
+        .map_to(VirtualAddress(0xFFFF_1000_0000_0000), dtb_phys, dtb_size)
+        .unwrap();
 
     let dtb = core::slice::from_raw_parts(0xFFFF_1000_0000_0000u64 as _, dtb_size);
     let dt = fdt::DeviceTree::new(&dtb).unwrap();
@@ -171,12 +191,21 @@ unsafe fn init() {
         let mut frame_allocator = crate::memory::FRAME_ALLOCATOR.lock();
         frame_allocator.insert_hole(start_addr, vm::KERNEL_LOAD_PHYS - start_addr);
         let kernel_end = vm::KERNEL_LOAD_PHYS + 1024 * 1024 * 2;
-        frame_allocator.insert_hole(vm::KERNEL_LOAD_PHYS + 1024 * 1024 * 2, dtb_phys - kernel_end);
+        frame_allocator.insert_hole(
+            vm::KERNEL_LOAD_PHYS + 1024 * 1024 * 2,
+            dtb_phys - kernel_end,
+        );
         let dtb_end = dtb_phys + dtb_size;
         frame_allocator.insert_hole(dtb_end, start_addr + size - dtb_end);
     }
 
-    KERNEL_TABLE.map_to(VirtualAddress(0xFFFF_FF00_0000_0000), PhysicalAddress(0x0000_0000_0900_0000), 4096).unwrap();
+    KERNEL_TABLE
+        .map_to(
+            VirtualAddress(0xFFFF_FF00_0000_0000),
+            PhysicalAddress(0x0000_0000_0900_0000),
+            4096,
+        )
+        .unwrap();
     tracing::subscriber::set_global_default(crate::tracing::PutcharSubscriber::new()).unwrap();
     let span = tracing::info_span!("kernel entry point");
     let _guard = span.enter();
@@ -184,13 +213,26 @@ unsafe fn init() {
     interrupt::init_interrupts();
 
     let (chosen, _chosen_cells) = dt.find_node("/chosen").unwrap();
-    let initrd_start_prop = chosen.properties().find(|p| p.name == "linux,initrd-start").unwrap();
-    let initrd_end_prop = chosen.properties().find(|p| p.name == "linux,initrd-end").unwrap();
+    let initrd_start_prop = chosen
+        .properties()
+        .find(|p| p.name == "linux,initrd-start")
+        .unwrap();
+    let initrd_end_prop = chosen
+        .properties()
+        .find(|p| p.name == "linux,initrd-end")
+        .unwrap();
     let initrd_start = BE::read_uint(initrd_start_prop.data, 4) as usize;
     let initrd_end = BE::read_uint(initrd_end_prop.data, 4) as usize;
     let initrd_size = initrd_end - initrd_start;
-    KERNEL_TABLE.map_to(VirtualAddress(0xFFFF_1000_4000_0000), PhysicalAddress(initrd_start), initrd_size).unwrap();
-    let initrd = core::slice::from_raw_parts(0xFFFF_1000_4000_0000 as *const u8, initrd_size as usize);
+    KERNEL_TABLE
+        .map_to(
+            VirtualAddress(0xFFFF_1000_4000_0000),
+            PhysicalAddress(initrd_start),
+            initrd_size,
+        )
+        .unwrap();
+    let initrd =
+        core::slice::from_raw_parts(0xFFFF_1000_4000_0000 as *const u8, initrd_size as usize);
 
     memory::init_main_heap(&mut KERNEL_TABLE);
 
@@ -228,6 +270,7 @@ unsafe fn init() {
             }
         }
     */
+    drop(_guard);
     crate::main(Arch {
         device_tree: dt,
         initrd,

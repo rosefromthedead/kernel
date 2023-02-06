@@ -196,31 +196,29 @@ impl Debug for IntermediateTable<Level2> {
 impl<L: IntermediateLevel> Table for IntermediateTable<L> {
     fn map_to(
         &mut self,
-        virt: VirtualAddress,
-        phys: PhysicalAddress,
-        size: usize,
+        mut virt: VirtualAddress,
+        mut phys: PhysicalAddress,
+        mut size: usize,
     ) -> Result<(), ()> {
         let start_idx = ((virt.0 as u64 >> L::VIRT_SHIFT_AMT) & 0x1FF) as usize;
-        let block_size = L::BLOCK_SIZE as usize;
-        let entries_needed = core::cmp::min((size + block_size - 1) / block_size, 512 - start_idx);
-        for i in 0..entries_needed {
-            let idx = i + start_idx;
-            let entry = &mut self.entries[idx];
-            let new_virt = VirtualAddress(virt.0 + i * L::BLOCK_SIZE as usize);
-            let new_phys = PhysicalAddress(phys.0 + i * L::BLOCK_SIZE as usize);
-            let new_size = size - i * L::BLOCK_SIZE as usize;
+        let end_idx = (((virt.0 + size - 1) as u64 >> L::VIRT_SHIFT_AMT) & 0x1FF) as usize;
+        for i in start_idx..=end_idx {
+            let entry = &mut self.entries[i];
             match entry.get_next_table_mut() {
                 Some(next_table) => {
-                    return next_table.map_to(new_virt, new_phys, new_size);
+                    return next_table.map_to(virt, phys, core::cmp::min(size, L::BLOCK_SIZE as usize));
                 },
                 None => {
                     let frame_phys = crate::memory::FRAME_ALLOCATOR.lock().alloc();
-                    unsafe { self.insert_raw(frame_phys, idx)?; }
+                    unsafe { self.insert_raw(frame_phys, i)?; }
                     let next_table_uninit = unsafe { &mut *(phys_to_virt(frame_phys).0 as *mut MaybeUninit<L::Next>) };
                     let next_table: &mut L::Next = Table::clear(next_table_uninit);
-                    next_table.map_to(new_virt, new_phys, new_size)?;
+                    next_table.map_to(virt, phys, size)?;
                 },
             }
+            virt += L::BLOCK_SIZE as usize;
+            phys += L::BLOCK_SIZE as usize;
+            size.saturating_sub(L::BLOCK_SIZE as usize);
         }
         if L::IS_TOP_LEVEL {
             unsafe { asm!("
@@ -579,8 +577,8 @@ impl Debug for Level3Table {
 impl Table for Level3Table {
     fn map_to(&mut self, virt: VirtualAddress, phys: PhysicalAddress, size: usize) -> Result<(), ()> {
         let start_idx = virt.0 >> 12 & 0x1FF;
-        let entries_needed = core::cmp::min((size + 4095) / 4096, 512 - start_idx);
-        for i in start_idx..start_idx + entries_needed {
+        let end_idx = (virt.0 + size - 1) >> 12 & 0x1FF;
+        for i in start_idx..=end_idx {
             let entry = &mut self.entries[i];
             let new_phys = PhysicalAddress(phys.0 + i * 4096);
             *entry = Level3TableEntry::new(new_phys);

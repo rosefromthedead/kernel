@@ -1,6 +1,7 @@
 use crate::{context::ActiveContext, vm::{Table, VirtualAddress}};
 
 pub fn load_elf(file: &[u8], context: &mut ActiveContext) -> Result<(), goblin::error::Error> {
+    let _guard = tracing::debug_span!("loading elf file").entered();
     let elf = goblin::elf::Elf::parse(file)?;
     let table = context.table();
     for program_header in elf.program_headers.iter().filter(|h| h.p_type == 1) {

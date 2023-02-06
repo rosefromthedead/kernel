@@ -1,49 +1,51 @@
-use core::arch::asm;
+use core::{arch::asm, fmt::Display};
 
-use crate::{vm::VirtualAddress, context::ActiveContext};
+use crate::{context::ActiveContext, vm::VirtualAddress};
 
 pub struct CpuState {
     registers: Registers,
-}
-
-#[repr(C)]
-struct Registers {
-    x: [u64; 31],
     sp: u64,
 
     elr: u64,
     spsr: u64,
 }
 
+#[repr(C)]
+pub(super) struct Registers {
+    pub x: [usize; 31],
+}
+
 impl CpuState {
     pub fn new() -> Self {
         CpuState {
-            registers: Registers {
-                x: [0; 31],
-                sp: 0,
-                elr: 0,
-                // TODO: Very dangerous and bad please review
-                spsr: 0,
-            }
+            registers: Registers { x: [0; 31] },
+            sp: 0,
+            elr: 0,
+            // TODO: Very dangerous and bad please review
+            spsr: 0,
         }
     }
 
     pub fn get_entry_point(&self) -> VirtualAddress {
-        VirtualAddress(self.registers.elr as usize)
+        VirtualAddress(self.elr as usize)
     }
 
     pub fn set_entry_point(&mut self, virt: VirtualAddress) {
-        self.registers.elr = virt.0 as u64;
+        self.elr = virt.0 as u64;
     }
 
     pub fn set_stack_pointer(&mut self, virt: VirtualAddress) {
-        self.registers.sp = virt.0 as u64;
+        self.sp = virt.0 as u64;
     }
 }
 
 pub unsafe fn jump_to_userspace(ctx: &ActiveContext) -> ! {
-    let registers = &ctx.user_state.registers as *const _;
+    let registers = &ctx.user_state as *const _;
     asm!("
+        adrp x0, EARLY_STACK
+        add x0, x0, #0x2000
+        mov sp, x0
+
         ldr x0, [x30, #248]
         ldr x1, [x30, #256]
         ldr x2, [x30, #264]
@@ -84,16 +86,21 @@ pub unsafe fn jump_to_userspace(ctx: &ActiveContext) -> ! {
         ldr x30, [x30, #240]
 
         eret
-    ", in("x30") registers);
-    unreachable!();
+    ", in("x30") registers, options(noreturn));
 }
 
-#[no_mangle]
-#[naked]
-pub unsafe extern "C" fn very_good_context() {
-    asm!("
-        mov x2, #42
-        svc #0
-        b .
-    ", options(noreturn));
+impl Display for Registers {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        for (i, reg) in self.x.iter().enumerate() {
+            if i < 10 {
+                write!(f, " ")?;
+            }
+            write!(f, "x{i}: {:#018x} ", reg)?;
+            match i % 4 {
+                3 => writeln!(f)?,
+                _ => {}
+            }
+        }
+        Ok(())
+    }
 }

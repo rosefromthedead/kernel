@@ -1,7 +1,11 @@
+use core::arch::asm;
+
 use aarch64_cpu::Writeable;
 use tracing::{info, info_span};
 
-use crate::arch::aarch64::regs::ExceptionClass;
+use crate::{arch::aarch64::regs::ExceptionClass, syscall};
+
+use super::context::Registers;
 
 // the first one in the table == base address of vector table
 extern "C" {
@@ -37,37 +41,30 @@ enum InterruptType {
 }
 
 #[no_mangle]
-extern "C" fn demux_interrupt(
-    source: InterruptSource,
-    ty: InterruptType,
-    a: u64,
-    b: u64,
-    c: u64,
-    d: u64,
-    e: u64,
-    f: u64,
-) {
+extern "C" fn demux_interrupt(regs: &Registers, source: InterruptSource, ty: InterruptType) {
     let link: u64;
-    unsafe { core::arch::asm!("
-        mrs {0}, ELR_EL1
-    ", out(reg) link) };
+    unsafe { asm!("mrs {0}, ELR_EL1", out(reg) link) };
     let syndrome = super::regs::ExceptionSyndrome::get();
-    let span = info_span!("interrupt handler", src=?source, ?ty, a, b, c, d, e, f, ?syndrome, link);
+    let span = info_span!("interrupt handler", src=?source, ?ty, ?syndrome, link);
     let _guard = span.enter();
     info!(target: "interrupt handler", "hello from interrupt handler");
-    if syndrome.cause != ExceptionClass::SvcAa64 {
-        panic!("unknown interrupt cause");
-    }
-    match syndrome.iss {
-        0 => {
-            unsafe { crate::context::exit() };
-        },
-        1 => {
-            // print
-            let message_bytes = unsafe { core::slice::from_raw_parts(e as *const _, f as usize) };
-            let message: &str = core::str::from_utf8(message_bytes).unwrap();
-            crate::interrupt::print(message);
-        },
-        n => panic!("invalid interrupt number {}", n),
+
+    if syndrome.cause == ExceptionClass::SvcAa64 {
+        syscall::dispatch(syndrome.iss as usize, &mut regs.x[0..8].try_into().unwrap());
+    } else {
+        let sp: u64;
+        unsafe {
+            match source {
+                InterruptSource::CurrentElSpEl0 => unreachable!("we don't configure it like that"),
+                InterruptSource::CurrentElSpElx => asm!("mov {0}, sp", out(reg) sp),
+                InterruptSource::LowerElAa64 => asm!("mrs {0}, SP_EL0", out(reg) sp),
+                InterruptSource::LowerElAa32 => unreachable!("no support for aa32"),
+            }
+        }
+        tracing::error!(
+            "unhandled exception at {link:#018x}!\n\n{} sp: {:#018x}",
+            regs,
+            sp,
+        );
     }
 }

@@ -113,10 +113,10 @@ impl Subscriber for PutcharSubscriber {
 
                 print!("  \\ {}: {} ", event.metadata().level(), event.metadata().name().trim_start_matches("event "));
             },
-            None => print!("{}: {} ", event.metadata().level(), event.metadata().name()),
+            None => print!("{}: {} ", event.metadata().level(), event.metadata().name().trim_start_matches("event ")),
         }
         event.record(&mut PrintVisitor);
-        print!("\n\n");
+        println!();
     }
 
     fn enter(&self, span: &span::Id) {

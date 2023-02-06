@@ -14,6 +14,12 @@ impl core::ops::Add<usize> for PhysicalAddress {
     }
 }
 
+impl core::ops::AddAssign<usize> for PhysicalAddress {
+    fn add_assign(&mut self, rhs: usize) {
+        *self = *self + rhs;
+    }
+}
+
 impl core::ops::Sub<PhysicalAddress> for PhysicalAddress {
     type Output = usize;
     fn sub(self, rhs: PhysicalAddress) -> Self::Output {

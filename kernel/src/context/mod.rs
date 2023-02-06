@@ -1,8 +1,11 @@
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use alloc::{collections::BTreeMap, boxed::Box};
+use alloc::{boxed::Box, collections::BTreeMap};
 
-use crate::{arch::{self, context::CpuState}, vm::{Table, TopLevelTable, VirtualAddress, PhysicalAddress}};
+use crate::{
+    arch::{self, context::CpuState},
+    vm::{PhysicalAddress, Table, TopLevelTable, VirtualAddress},
+};
 
 // TODO: make it not static mut
 static mut CONTEXTS: BTreeMap<usize, ContextEntry> = BTreeMap::new();
@@ -43,9 +46,7 @@ impl SuspendedContext {
         // TODO: save old context
         let SuspendedContext { user_state, table } = *self;
         unsafe { arch::vm::switch_table(table) };
-        ActiveContext {
-            user_state,
-        }
+        ActiveContext { user_state }
     }
 }
 
@@ -72,12 +73,17 @@ impl ActiveContext {
     }
 
     pub fn jump_to_userspace(&mut self) {
-        unsafe { arch::context::jump_to_userspace(self); }
+        unsafe {
+            arch::context::jump_to_userspace(self);
+        }
     }
 }
 
-pub fn exit() {
+pub fn exit() -> ! {
     if CURRENT_CONTEXT.load(Ordering::Relaxed) == 0 {
-        crate::arch::platform::shutdown();
+        // safety: only running on qemu means system is always psci :)
+        unsafe { crate::arch::platform::shutdown() };
+    } else {
+        todo!()
     }
 }

@@ -7,9 +7,10 @@
 #![feature(new_uninit)]
 #![feature(panic_info_message)]
 #![feature(ptr_as_uninit)]
+#![feature(pointer_is_aligned)]
 
-use alloc::boxed::Box;
 use ::tracing::info_span;
+use alloc::boxed::Box;
 
 extern crate alloc;
 
@@ -18,16 +19,13 @@ mod arch;
 mod console;
 mod context;
 mod elf;
-mod interrupt;
 mod memory;
 mod panic;
+mod syscall;
 mod tracing;
 mod vm;
 
 pub fn main(arch: arch::Arch) {
-    let span = info_span!("kernel main");
-    let _guard = span.enter();
-
     let init_ctx = Box::new(context::SuspendedContext::new());
     let mut active_ctx = init_ctx.enter();
     active_ctx.init();
