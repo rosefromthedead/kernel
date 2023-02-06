@@ -1,4 +1,4 @@
-use crate::{context::ActiveContext, vm::{Table, VirtualAddress}};
+use crate::{context::ActiveContext, fmt::ForceLowerHex, vm::{Table, VirtualAddress}};
 
 pub fn load_elf(file: &[u8], context: &mut ActiveContext) -> Result<(), goblin::error::Error> {
     let _guard = tracing::debug_span!("loading elf file").entered();
@@ -10,9 +10,10 @@ pub fn load_elf(file: &[u8], context: &mut ActiveContext) -> Result<(), goblin::
             continue;
         }
 
-        tracing::debug!(va = program_header.p_vaddr, size = program_header.p_memsz, "loading program header");
-
+        let start = VirtualAddress(vm_range.start);
         let size = vm_range.end - vm_range.start;
+        tracing::debug!(va=?start, size=?ForceLowerHex(size), "loading program header");
+
         table.alloc(VirtualAddress(vm_range.start), size).unwrap();
         let dest = unsafe {
             core::slice::from_raw_parts_mut(vm_range.start as *mut u8, size)

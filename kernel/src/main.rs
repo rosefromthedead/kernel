@@ -9,7 +9,6 @@
 #![feature(ptr_as_uninit)]
 #![feature(pointer_is_aligned)]
 
-use ::tracing::info_span;
 use alloc::boxed::Box;
 
 extern crate alloc;
@@ -19,6 +18,7 @@ mod arch;
 mod console;
 mod context;
 mod elf;
+mod fmt;
 mod memory;
 mod panic;
 mod syscall;

@@ -1,8 +1,8 @@
-use crate::vm::{PhysicalAddress, VirtualAddress, Table};
+use crate::{fmt::ForceLowerHex, vm::{PhysicalAddress, VirtualAddress, Table}};
 use alloc::boxed::Box;
 use core::{arch::asm, fmt::{Debug, Formatter}, marker::PhantomData, mem::MaybeUninit};
 
-use super::fmt::{debug_page_or_block, ForceUpperHex};
+use super::fmt::debug_page_or_block;
 
 macro_rules! set_bit {
     ($value:expr, $bit:expr, $bool:expr) => {
@@ -275,13 +275,13 @@ impl<L: IntermediateLevel> Debug for IntermediateTableEntry<L> {
         }
         if let Some(table) = self.table_address() {
             return f.debug_tuple("Table")
-                .field(&ForceUpperHex(self.value))
+                .field(&ForceLowerHex(self.value))
                 .field(unsafe { &*(phys_to_virt(table).0 as *const L::Next) })
                 .finish()
         }
         if let Some(block) = self.block_address() {
             return f.debug_tuple("Block")
-                .field(&ForceUpperHex(self.value))
+                .field(&ForceLowerHex(self.value))
                 .field(&block)
                 .finish()
         }
