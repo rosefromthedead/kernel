@@ -3,7 +3,7 @@ use core::arch::asm;
 use aarch64_cpu::Writeable;
 use tracing::{info, info_span};
 
-use crate::{arch::aarch64::regs::ExceptionClass, syscall};
+use crate::{arch::aarch64::regs::ExceptionClass, syscall, vm::VirtualAddress};
 
 use super::context::Registers;
 
@@ -42,12 +42,12 @@ enum InterruptType {
 
 #[no_mangle]
 extern "C" fn demux_interrupt(regs: &Registers, source: InterruptSource, ty: InterruptType) {
-    let link: u64;
+    let link: usize;
     unsafe { asm!("mrs {0}, ELR_EL1", out(reg) link) };
+    let link = VirtualAddress(link);
     let syndrome = super::regs::ExceptionSyndrome::get();
-    let span = info_span!("interrupt handler", src=?source, ?ty, ?syndrome, link);
+    let span = info_span!("interrupt handler", src=?source, ?ty, cause=?syndrome.cause, ?link);
     let _guard = span.enter();
-    info!(target: "interrupt handler", "hello from interrupt handler");
 
     if syndrome.cause == ExceptionClass::SvcAa64 {
         syscall::dispatch(syndrome.iss as usize, &mut regs.x[0..8].try_into().unwrap());
@@ -61,10 +61,6 @@ extern "C" fn demux_interrupt(regs: &Registers, source: InterruptSource, ty: Int
                 InterruptSource::LowerElAa32 => unreachable!("no support for aa32"),
             }
         }
-        tracing::error!(
-            "unhandled exception at {link:#018x}!\n\n{} sp: {:#018x}",
-            regs,
-            sp,
-        );
+        tracing::error!("unhandled exception at {link:?}!\n\n{regs} sp: {sp:#018x}");
     }
 }

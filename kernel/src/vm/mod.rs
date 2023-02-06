@@ -4,8 +4,19 @@ use crate::memory::Chunk;
 
 pub use crate::arch::vm::TopLevelTable;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
+#[repr(transparent)]
 pub struct PhysicalAddress(pub usize);
+
+impl core::fmt::Debug for PhysicalAddress {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        if self.0 <= 0xffff_ffff {
+            write!(f, "0p{:08x}", self.0)
+        } else {
+            write!(f, "0p{:016x}", self.0)
+        }
+    }
+}
 
 impl core::ops::Add<usize> for PhysicalAddress {
     type Output = Self;
@@ -27,8 +38,25 @@ impl core::ops::Sub<PhysicalAddress> for PhysicalAddress {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
+#[repr(transparent)]
 pub struct VirtualAddress(pub usize);
+
+impl<T> From<*const T> for VirtualAddress {
+    fn from(ptr: *const T) -> Self {
+        VirtualAddress(ptr as usize)
+    }
+}
+
+impl core::fmt::Debug for VirtualAddress {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        if self.0 <= 0xffff_ffff {
+            write!(f, "0v{:08x}", self.0)
+        } else {
+            write!(f, "0v{:016x}", self.0)
+        }
+    }
+}
 
 impl core::ops::Add<usize> for VirtualAddress {
     type Output = Self;
