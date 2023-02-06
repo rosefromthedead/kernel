@@ -218,7 +218,7 @@ impl<L: IntermediateLevel> Table for IntermediateTable<L> {
             }
             virt += L::BLOCK_SIZE as usize;
             phys += L::BLOCK_SIZE as usize;
-            size.saturating_sub(L::BLOCK_SIZE as usize);
+            size = size.saturating_sub(L::BLOCK_SIZE as usize);
         }
         if L::IS_TOP_LEVEL {
             unsafe { asm!("
