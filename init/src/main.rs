@@ -5,16 +5,23 @@
 use core::{arch::asm, fmt::Write};
 
 #[naked]
-extern "C" fn print(s: *const u8, len: usize) {
+extern "C" fn sys_print(s: *const u8, len: usize) {
     unsafe {
         asm!("svc #1; ret", options(noreturn));
+    }
+}
+
+#[naked]
+extern "C" fn sys_yield() {
+    unsafe {
+        asm!("svc #2; ret", options(noreturn));
     }
 }
 
 struct Stdout;
 impl Write for Stdout {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        print(s.as_ptr(), s.len());
+        sys_print(s.as_ptr(), s.len());
         Ok(())
     }
 }
@@ -22,7 +29,9 @@ impl Write for Stdout {
 #[no_mangle]
 fn _start() {
     let _ = writeln!(Stdout, "Hello, world!");
+    sys_yield();
     let _ = writeln!(Stdout, "I'm having a great time in userspace");
+    sys_yield();
     unsafe { asm!("svc #0", options(noreturn)) }
 }
 

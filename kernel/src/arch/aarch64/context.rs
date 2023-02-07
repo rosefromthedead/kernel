@@ -11,10 +11,11 @@ pub struct SuspendedCpuState {
 }
 
 pub struct ActiveCpuState {
-    registers: Registers,
+    pub(super) registers: Registers,
     // sp, elr, spsr are stored in their registers upon context entry
 }
 
+#[derive(Clone)]
 #[repr(C)]
 pub(super) struct Registers {
     pub x: [usize; 31],
@@ -43,12 +44,34 @@ impl SuspendedCpuState {
 }
 
 impl ActiveCpuState {
+    pub fn suspend(self) -> SuspendedCpuState {
+        let ActiveCpuState { registers } = self;
+        let sp: usize;
+        let elr: usize;
+        let spsr: u64;
+        unsafe {
+            asm!("mrs {0}, SP_EL0", out(reg) sp, options(nomem, nostack, preserves_flags));
+            asm!("mrs {0}, ELR_EL1", out(reg) elr, options(nomem, nostack, preserves_flags));
+            asm!("mrs {0}, SPSR_EL1", out(reg) spsr, options(nomem, nostack, preserves_flags));
+        }
+        SuspendedCpuState {
+            registers,
+            sp: VirtualAddress(sp),
+            elr: VirtualAddress(elr),
+            spsr,
+        }
+    }
+
     pub fn set_entry_point(&mut self, virt: VirtualAddress) {
         unsafe { asm!("msr ELR_EL1, {0}", in(reg) virt.0, options(nomem, nostack, preserves_flags)) }
     }
 
     pub fn set_stack_pointer(&mut self, virt: VirtualAddress) {
         unsafe { asm!("msr SP_EL0, {0}", in(reg) virt.0, options(nomem, nostack, preserves_flags)) }
+    }
+
+    pub fn syscall_params(&mut self) -> &mut [usize; 8] {
+        (&mut self.registers.x[0..8]).try_into().unwrap()
     }
 }
 

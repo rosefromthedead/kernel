@@ -1,11 +1,11 @@
 use core::arch::asm;
 
 use aarch64_cpu::Writeable;
-use tracing::{info, info_span};
+use tracing::info_span;
 
 use crate::{arch::aarch64::regs::ExceptionClass, syscall, vm::VirtualAddress};
 
-use super::context::Registers;
+use super::context::{Registers, ActiveCpuState};
 
 // the first one in the table == base address of vector table
 extern "C" {
@@ -42,6 +42,8 @@ enum InterruptType {
 
 #[no_mangle]
 extern "C" fn demux_interrupt(regs: &Registers, source: InterruptSource, ty: InterruptType) {
+    // not sure how to avoid the clone
+    let state = ActiveCpuState { registers: regs.clone() };
     let link: usize;
     unsafe { asm!("mrs {0}, ELR_EL1", out(reg) link) };
     let link = VirtualAddress(link);
@@ -50,7 +52,7 @@ extern "C" fn demux_interrupt(regs: &Registers, source: InterruptSource, ty: Int
     let _guard = span.enter();
 
     if syndrome.cause == ExceptionClass::SvcAa64 {
-        syscall::dispatch(syndrome.iss as usize, &mut regs.x[0..8].try_into().unwrap());
+        syscall::dispatch(syndrome.iss as usize, state);
     } else {
         let sp: u64;
         unsafe {
