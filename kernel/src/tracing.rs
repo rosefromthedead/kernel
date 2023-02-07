@@ -1,9 +1,11 @@
-use core::{num::NonZeroU64, sync::atomic::{AtomicU64, Ordering::Relaxed}};
+use core::{num::NonZeroU64, sync::atomic::{AtomicU64, Ordering::Relaxed, AtomicBool}};
 
 use alloc::{collections::BTreeMap, string::String};
 use spin::Mutex;
 use tracing::{Metadata, Subscriber, span};
 use tracing_core::span::Current;
+
+pub static RESET: AtomicBool = AtomicBool::new(false);
 
 struct Span {
     metadata: &'static Metadata<'static>,
@@ -53,6 +55,11 @@ impl PutcharSubscriber {
     }
 
     fn get_current_span(&self) -> Option<span::Id> {
+        if RESET.load(Relaxed) {
+            self.current_span.store(0, Relaxed);
+            RESET.store(false, Relaxed);
+            return None;
+        }
         NonZeroU64::new(self.current_span.load(Relaxed)).map(span::Id::from_non_zero_u64)
     }
 }

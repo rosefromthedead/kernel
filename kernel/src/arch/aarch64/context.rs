@@ -76,6 +76,7 @@ impl ActiveCpuState {
 }
 
 pub unsafe fn jump_to_userspace(ctx: &ActiveContext) -> ! {
+    crate::tracing::RESET.store(true, core::sync::atomic::Ordering::Relaxed);
     let registers = &ctx.user_state as *const _;
     asm!("
         adrp x0, EARLY_STACK

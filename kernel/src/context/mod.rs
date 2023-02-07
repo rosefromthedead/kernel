@@ -104,6 +104,7 @@ pub fn schedule() -> (usize, Box<SuspendedContext>) {
 }
 
 pub fn switch(current: ActiveContext, to_id: usize, to: Box<SuspendedContext>) -> ActiveContext {
+    tracing::trace!("switching to context {to_id}");
     // safety: go away
     let contexts = unsafe { &mut CONTEXTS };
     let old_id = CURRENT_CONTEXT.load(Ordering::Relaxed);

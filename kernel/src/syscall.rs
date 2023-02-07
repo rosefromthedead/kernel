@@ -1,5 +1,3 @@
-use tracing::trace;
-
 use crate::{arch::context::ActiveCpuState, context::ActiveContext};
 
 #[derive(Debug)]
@@ -44,13 +42,11 @@ pub fn dispatch(num: usize, mut state: ActiveCpuState) {
 
 #[tracing::instrument(level = "debug")]
 fn syscall_exit() -> ! {
-    trace!("");
     crate::context::exit();
 }
 
 #[tracing::instrument(level = "debug", err(Debug))]
 fn syscall_print(base: *const u8, len: usize) -> Result<(), Error> {
-    trace!("");
     let bytes = user_slice(base, len)?;
     let bytes = unsafe { core::slice::from_raw_parts(base, len) };
     let putchar = crate::console::get_writer().0;
@@ -62,7 +58,6 @@ fn syscall_print(base: *const u8, len: usize) -> Result<(), Error> {
 
 #[tracing::instrument(level = "debug", skip_all)]
 fn syscall_yield(state: ActiveCpuState) -> ! {
-    trace!("");
     // TODO: figure out how to properly construct this. probably something to do with a global
     // which stores fds and mapping info etc when we have that stuff
     let old_active = ActiveContext { user_state: state };
