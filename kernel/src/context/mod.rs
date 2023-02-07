@@ -3,7 +3,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use alloc::{boxed::Box, collections::BTreeMap};
 
 use crate::{
-    arch::{self, context::CpuState},
+    arch::{self, context::{SuspendedCpuState, ActiveCpuState}},
     vm::{PhysicalAddress, Table, TopLevelTable, VirtualAddress},
 };
 
@@ -29,7 +29,7 @@ impl ContextEntry {
 }
 
 pub struct SuspendedContext {
-    user_state: CpuState,
+    user_state: SuspendedCpuState,
     table: PhysicalAddress,
 }
 
@@ -37,7 +37,7 @@ impl SuspendedContext {
     pub fn new() -> Self {
         let table = crate::memory::FRAME_ALLOCATOR.lock().alloc();
         SuspendedContext {
-            user_state: CpuState::new(),
+            user_state: SuspendedCpuState::new(),
             table,
         }
     }
@@ -45,13 +45,14 @@ impl SuspendedContext {
     pub fn enter(self: Box<Self>) -> ActiveContext {
         // TODO: save old context
         let SuspendedContext { user_state, table } = *self;
+        let user_state = user_state.enter();
         unsafe { arch::vm::switch_table(table) };
         ActiveContext { user_state }
     }
 }
 
 pub struct ActiveContext {
-    pub user_state: CpuState,
+    pub user_state: ActiveCpuState,
 }
 
 impl ActiveContext {
@@ -66,10 +67,6 @@ impl ActiveContext {
 
     pub fn table(&mut self) -> &mut TopLevelTable {
         unsafe { &mut *(arch::vm::USER_TABLE.0 as *mut _) }
-    }
-
-    pub fn user_state(&self) -> &CpuState {
-        &self.user_state
     }
 
     pub fn jump_to_userspace(&mut self) {

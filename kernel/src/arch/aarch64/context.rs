@@ -2,12 +2,17 @@ use core::{arch::asm, fmt::Display};
 
 use crate::{context::ActiveContext, vm::VirtualAddress};
 
-pub struct CpuState {
+pub struct SuspendedCpuState {
     registers: Registers,
-    sp: u64,
+    sp: VirtualAddress,
 
-    elr: u64,
+    elr: VirtualAddress,
     spsr: u64,
+}
+
+pub struct ActiveCpuState {
+    registers: Registers,
+    // sp, elr, spsr are stored in their registers upon context entry
 }
 
 #[repr(C)]
@@ -15,27 +20,35 @@ pub(super) struct Registers {
     pub x: [usize; 31],
 }
 
-impl CpuState {
+impl SuspendedCpuState {
     pub fn new() -> Self {
-        CpuState {
+        SuspendedCpuState {
             registers: Registers { x: [0; 31] },
-            sp: 0,
-            elr: 0,
+            sp: VirtualAddress(0),
+            elr: VirtualAddress(0),
             // TODO: Very dangerous and bad please review
             spsr: 0,
         }
     }
 
-    pub fn get_entry_point(&self) -> VirtualAddress {
-        VirtualAddress(self.elr as usize)
+    pub fn enter(self) -> ActiveCpuState {
+        let SuspendedCpuState { registers, sp, elr, spsr } = self;
+        unsafe {
+            asm!("msr SP_EL0, {0}", in(reg) sp.0, options(nomem, nostack, preserves_flags));
+            asm!("msr ELR_EL1, {0}", in(reg) elr.0, options(nomem, nostack, preserves_flags));
+            asm!("msr SPSR_EL1, {0}", in(reg) spsr, options(nomem, nostack, preserves_flags));
+        }
+        ActiveCpuState { registers }
     }
+}
 
+impl ActiveCpuState {
     pub fn set_entry_point(&mut self, virt: VirtualAddress) {
-        self.elr = virt.0 as u64;
+        unsafe { asm!("msr ELR_EL1, {0}", in(reg) virt.0, options(nomem, nostack, preserves_flags)) }
     }
 
     pub fn set_stack_pointer(&mut self, virt: VirtualAddress) {
-        self.sp = virt.0 as u64;
+        unsafe { asm!("msr SP_EL0, {0}", in(reg) virt.0, options(nomem, nostack, preserves_flags)) }
     }
 }
 
@@ -45,13 +58,6 @@ pub unsafe fn jump_to_userspace(ctx: &ActiveContext) -> ! {
         adrp x0, EARLY_STACK
         add x0, x0, #0x2000
         mov sp, x0
-
-        ldr x0, [x30, #248]
-        ldr x1, [x30, #256]
-        ldr x2, [x30, #264]
-        msr SP_EL0, x0
-        msr ELR_EL1, x1
-        msr SPSR_EL1, x2
 
         ldr x0, [x30, #0]
         ldr x1, [x30, #8]
