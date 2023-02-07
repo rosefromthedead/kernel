@@ -27,8 +27,8 @@
     mov x0, sp
     mov x1, #\source
     mov x2, #\type
-    adr x30, user_return
-    b demux_interrupt
+    bl demux_interrupt
+    b user_return
 .endm
 
 vector current_el_sp_el0_sync, 0, 0
