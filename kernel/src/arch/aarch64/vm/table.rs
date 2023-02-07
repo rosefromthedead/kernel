@@ -71,7 +71,7 @@ impl IntermediateLevel for Level2 {
     const IS_TOP_LEVEL: bool = false;
 }
 
-#[repr(align(4096))]
+#[repr(C, align(4096))]
 pub struct IntermediateTable<L: IntermediateLevel> {
     entries: [IntermediateTableEntry<L>; 512],
     _tables: PhantomData<[Option<L::Next>; 512]>,
@@ -538,7 +538,7 @@ impl PageOrBlockDesc for IntermediateTableEntry<Level2> {
     }
 }
 
-#[repr(align(4096))]
+#[repr(C, align(4096))]
 pub struct Level3Table {
     entries: [Level3TableEntry; 512],
 }
