@@ -1,4 +1,4 @@
-use crate::{arch::context::ActiveCpuState, context::ActiveContext};
+use crate::arch::context::ActiveContext;
 
 #[derive(Debug)]
 #[repr(usize)]
@@ -21,7 +21,7 @@ fn user_slice<'a, T>(base: *const T, len: usize) -> Result<&'a [T], Error> {
     Ok(unsafe { core::slice::from_raw_parts(base, len) })
 }
 
-pub fn dispatch(num: usize, mut state: ActiveCpuState) {
+pub fn dispatch(num: usize, mut state: ActiveContext) {
     // lol
     let [ref mut a, ref mut b, ref mut _c, ref mut _d, ref mut _e, ref mut _f, ref mut _g, ref mut h] =
         state.syscall_params();
@@ -57,11 +57,10 @@ fn syscall_print(base: *const u8, len: usize) -> Result<(), Error> {
 }
 
 #[tracing::instrument(level = "debug", skip_all)]
-fn syscall_yield(state: ActiveCpuState) -> ! {
+fn syscall_yield(old_active: ActiveContext) -> ! {
     // TODO: figure out how to properly construct this. probably something to do with a global
     // which stores fds and mapping info etc when we have that stuff
-    let old_active = ActiveContext { user_state: state };
     let (id, cx) = crate::context::schedule();
     let mut new_active = crate::context::switch(old_active, id, cx);
-    new_active.jump_to_userspace()
+    unsafe { new_active.jump_to_userspace() }
 }

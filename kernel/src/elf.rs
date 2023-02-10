@@ -1,9 +1,9 @@
-use crate::{context::ActiveContext, fmt::ForceLowerHex, vm::{Table, VirtualAddress}};
+use crate::{arch::context::ActiveContext, fmt::ForceLowerHex, vm::{Table, VirtualAddress}};
 
 pub fn load_elf(file: &[u8], context: &mut ActiveContext) -> Result<(), goblin::error::Error> {
     let _guard = tracing::debug_span!("loading elf file").entered();
     let elf = goblin::elf::Elf::parse(file)?;
-    let table = context.table();
+    let table = unsafe { context.table() };
     for program_header in elf.program_headers.iter().filter(|h| h.p_type == 1) {
         let vm_range = program_header.vm_range();
         if vm_range.start == 0 {
@@ -23,7 +23,7 @@ pub fn load_elf(file: &[u8], context: &mut ActiveContext) -> Result<(), goblin::
         dest.copy_from_slice(src);
     }
 
-    context.user_state.set_entry_point(VirtualAddress(elf.entry as usize));
+    context.set_entry_point(VirtualAddress(elf.entry as usize));
 
     Ok(())
 }

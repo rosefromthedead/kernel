@@ -19,14 +19,17 @@ pub unsafe fn switch_table(phys: PhysicalAddress) {
 pub fn init_user_table(phys: PhysicalAddress) {
     unsafe {
         KERNEL_TABLE.map_to(USER_TABLE_SCRATCH, phys, 4096).unwrap();
-        let new_table_uninit = &mut *(USER_TABLE_SCRATCH.0 as *mut MaybeUninit<TopLevelTable>);
+        let new_table_uninit = unsafe { &mut *(USER_TABLE_SCRATCH.0 as *mut MaybeUninit<TopLevelTable>) };
         let init: &mut TopLevelTable = Table::clear(new_table_uninit);
         // recursive mapping!
-        init.insert_raw(phys, 511).unwrap();
-        asm!("
-            tlbi vmalle1
-            isb
-        ");
+        unsafe {
+            init.insert_raw(get_current_user_table(), 511).unwrap();
+            asm!("
+                tlbi vmalle1
+                isb
+            ");
+        }
+        KERNEL_TABLE.unmap(USER_TABLE_SCRATCH, 4096);
     }
 }
 

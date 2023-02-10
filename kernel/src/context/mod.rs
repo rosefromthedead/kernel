@@ -1,89 +1,40 @@
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use alloc::{boxed::Box, collections::BTreeMap};
+use alloc::{boxed::Box, collections::BTreeMap, vec::Vec};
 
 use crate::{
-    arch::{self, context::{SuspendedCpuState, ActiveCpuState}, vm::get_current_user_table},
-    vm::{PhysicalAddress, Table, TopLevelTable, VirtualAddress},
+    arch::context::{ActiveContext, SuspendedContext},
+    vm::Mapping,
 };
 
 // TODO: make it not static mut
-pub static mut CONTEXTS: BTreeMap<usize, ContextEntry> = BTreeMap::new();
+pub static mut CONTEXTS: BTreeMap<usize, ContextState> = BTreeMap::new();
 pub static CURRENT_CONTEXT: AtomicUsize = AtomicUsize::new(0);
 
-pub enum ContextEntry {
+pub enum ContextState {
     /// The context is not currently active on any CPU
-    Suspended(Box<SuspendedContext>),
+    Suspended(Box<SuspendedContext>, Box<Context>),
     /// The context is active on some CPU and cannot be accessed
     Active,
 }
 
-impl ContextEntry {
+impl ContextState {
     pub fn is_suspended(&self) -> bool {
-        matches!(self, ContextEntry::Suspended(_))
+        matches!(self, ContextState::Suspended(_, _))
     }
 
-    pub fn take(&mut self) -> Option<Box<SuspendedContext>> {
-        let entry = core::mem::replace(self, ContextEntry::Active);
+    pub fn take(&mut self) -> Option<(Box<SuspendedContext>, Box<Context>)> {
+        let entry = core::mem::replace(self, ContextState::Active);
         match entry {
-            ContextEntry::Suspended(ctx) => Some(ctx),
+            ContextState::Suspended(suspended, cx) => Some((suspended, cx)),
             _ => None,
         }
     }
 }
 
-pub struct SuspendedContext {
-    user_state: SuspendedCpuState,
-    table: PhysicalAddress,
-}
-
-impl SuspendedContext {
-    pub fn new() -> Self {
-        let table = crate::memory::FRAME_ALLOCATOR.lock().alloc();
-        SuspendedContext {
-            user_state: SuspendedCpuState::new(),
-            table,
-        }
-    }
-
-    pub fn enter(self: Box<Self>) -> ActiveContext {
-        let SuspendedContext { user_state, table } = *self;
-        let user_state = user_state.enter();
-        unsafe { arch::vm::switch_table(table) };
-        ActiveContext { user_state }
-    }
-}
-
-pub struct ActiveContext {
-    pub user_state: ActiveCpuState,
-}
-
-impl ActiveContext {
-    pub fn init(&mut self) {
-        let table_phys = arch::vm::get_current_user_table();
-        arch::vm::init_user_table(table_phys);
-        let table = self.table();
-        let sp = VirtualAddress(0x0000_0000_7FFF_F000);
-        table.alloc(sp, 4096).unwrap();
-        self.user_state.set_stack_pointer(sp + 4096);
-    }
-
-    pub fn table(&mut self) -> &mut TopLevelTable {
-        unsafe { &mut *(arch::vm::USER_TABLE.0 as *mut _) }
-    }
-
-    pub fn jump_to_userspace(&mut self) -> ! {
-        unsafe {
-            arch::context::jump_to_userspace(self);
-        }
-    }
-
-    pub fn suspend(self) -> SuspendedContext {
-        SuspendedContext {
-            user_state: self.user_state.suspend(),
-            table: get_current_user_table(),
-        }
-    }
+#[derive(Default)]
+pub struct Context {
+    text: Vec<Mapping>,
 }
 
 pub fn exit() -> ! {
@@ -96,22 +47,22 @@ pub fn exit() -> ! {
 }
 
 /// Selects a context to switch to.
-pub fn schedule() -> (usize, Box<SuspendedContext>) {
+pub fn schedule() -> (usize, (Box<SuspendedContext>, Box<Context>)) {
     let contexts = unsafe { &mut CONTEXTS };
     let Some((&id, entry)) =
-        contexts.iter_mut().find(|(_i, c)| c.is_suspended()) else { panic!() };
+        contexts.iter_mut().find(|(_i, s)| s.is_suspended()) else { panic!() };
     (id, entry.take().unwrap())
 }
 
-pub fn switch(current: ActiveContext, to_id: usize, to: Box<SuspendedContext>) -> ActiveContext {
+pub fn switch(current: ActiveContext, to_id: usize, to: (Box<SuspendedContext>, Box<Context>)) -> ActiveContext {
     tracing::trace!("switching to context {to_id}");
     // safety: go away
     let contexts = unsafe { &mut CONTEXTS };
     let old_id = CURRENT_CONTEXT.load(Ordering::Relaxed);
-    let suspended = current.suspend();
-    *contexts.get_mut(&old_id).unwrap() = ContextEntry::Suspended(Box::new(suspended));
+    let (suspended, cx) = current.suspend();
+    *contexts.get_mut(&old_id).unwrap() = ContextState::Suspended(Box::new(suspended), cx);
 
-    let mut active = to.enter();
+    let mut active = to.0.enter(to.1);
     // TODO: check ordering
     CURRENT_CONTEXT.store(to_id, Ordering::Relaxed);
     active

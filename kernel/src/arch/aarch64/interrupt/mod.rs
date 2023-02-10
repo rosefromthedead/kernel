@@ -5,7 +5,7 @@ use tracing::info_span;
 
 use crate::{arch::aarch64::regs::ExceptionClass, syscall, vm::VirtualAddress};
 
-use super::context::{Registers, ActiveCpuState};
+use super::context::{Registers, ActiveContext};
 
 // the first one in the table == base address of vector table
 extern "C" {
@@ -43,7 +43,7 @@ enum InterruptType {
 #[no_mangle]
 extern "C" fn demux_interrupt(regs: &Registers, source: InterruptSource, ty: InterruptType) {
     // not sure how to avoid the clone
-    let state = ActiveCpuState { registers: regs.clone() };
+    let state = ActiveContext { registers: regs.clone() };
     let link: usize;
     unsafe { asm!("mrs {0}, ELR_EL1", out(reg) link) };
     let link = VirtualAddress(link);

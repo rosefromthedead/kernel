@@ -108,3 +108,9 @@ pub trait Table: Sized {
         Ok(())
     }
 }
+
+pub struct Mapping {
+    virt: VirtualAddress,
+    phys: PhysicalAddress,
+    size: usize,
+}

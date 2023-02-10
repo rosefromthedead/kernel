@@ -11,7 +11,7 @@
 
 use alloc::boxed::Box;
 
-use crate::context::ContextEntry;
+use crate::context::ContextState;
 
 extern crate alloc;
 
@@ -29,19 +29,14 @@ mod vm;
 
 pub fn main(arch: arch::Arch) {
     let contexts = unsafe { &mut context::CONTEXTS };
-    let mut cx1 = Box::new(context::SuspendedContext::new());
-    let mut active = cx1.enter();
-    contexts.insert(0, ContextEntry::Active);
+    let mut suspended = Box::new(arch::context::SuspendedContext::new());
+    let cx = Box::default();
+    let mut active = suspended.enter(cx);
+    contexts.insert(0, ContextState::Active);
     active.init();
     elf::load_elf(arch.initrd, &mut active).unwrap();
 
-    contexts.insert(1, ContextEntry::Active);
-    let mut cx2 = Box::new(context::SuspendedContext::new());
-    let mut active = context::switch(active, 1, cx2);
-    active.init();
-    elf::load_elf(arch.initrd, &mut active).unwrap();
-
-    active.jump_to_userspace();
+    unsafe { active.jump_to_userspace() };
 
     panic!("end of main");
 }
