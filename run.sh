@@ -9,7 +9,7 @@ cd kernel
 cd ..
 
 cd init
-cargo build --target aarch64-unknown-none
+cargo build --target aarch64-unknown-none -Zbuild-std=core
 cd ..
 
 qemu-system-aarch64 -M virt -cpu cortex-a53 -m 1g -nographic -kernel build/kernel.ub -initrd target/aarch64-unknown-none/debug/init $@
