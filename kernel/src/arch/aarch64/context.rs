@@ -1,8 +1,9 @@
 use core::{arch::asm, fmt::Display};
 
-use alloc::boxed::Box;
-
-use crate::{vm::{VirtualAddress, PhysicalAddress, Table}, context::Context};
+use crate::{
+    context::Context,
+    vm::{PhysicalAddress, Table, VirtualAddress},
+};
 
 use super::vm::TopLevelTable;
 
@@ -39,33 +40,38 @@ impl SuspendedContext {
         }
     }
 
-    pub fn enter(self, cx: Box<Context>) -> ActiveContext {
-        let SuspendedContext { table, registers, sp, elr, spsr } = self;
-        let cx = Box::leak(cx);
+    pub fn enter(self, context: *const Context) -> ActiveContext {
+        let SuspendedContext {
+            table,
+            registers,
+            sp,
+            elr,
+            spsr,
+        } = self;
         unsafe {
             super::vm::switch_table(table);
             asm!("msr SP_EL0, {0}", in(reg) sp.0, options(nomem, nostack, preserves_flags));
             asm!("msr ELR_EL1, {0}", in(reg) elr.0, options(nomem, nostack, preserves_flags));
             asm!("msr SPSR_EL1, {0}", in(reg) spsr, options(nomem, nostack, preserves_flags));
-            asm!("msr TPIDR_EL0, {0}", in(reg) cx, options(nomem, nostack, preserves_flags));
+            asm!("msr TPIDR_EL0, {0}", in(reg) context, options(nomem, nostack, preserves_flags));
         }
         ActiveContext { registers }
     }
 }
 
 impl ActiveContext {
-    pub fn suspend(self) -> (SuspendedContext, Box<Context>) {
+    pub fn suspend(self) -> (SuspendedContext, VirtualAddress) {
         let ActiveContext { registers } = self;
         let sp: usize;
         let elr: usize;
         let spsr: u64;
-        let cx: *mut Context;
+        let thread: usize;
         let table;
         unsafe {
             asm!("mrs {0}, SP_EL0", out(reg) sp, options(nomem, nostack, preserves_flags));
             asm!("mrs {0}, ELR_EL1", out(reg) elr, options(nomem, nostack, preserves_flags));
             asm!("mrs {0}, SPSR_EL1", out(reg) spsr, options(nomem, nostack, preserves_flags));
-            asm!("mrs {0}, TPIDR_EL1", out(reg) cx, options(nomem, nostack, preserves_flags));
+            asm!("mrs {0}, TPIDR_EL1", out(reg) thread, options(nomem, nostack, preserves_flags));
             table = super::vm::get_current_user_table();
         }
         let suspended = SuspendedContext {
@@ -75,11 +81,13 @@ impl ActiveContext {
             elr: VirtualAddress(elr),
             spsr,
         };
-        (suspended, unsafe { Box::from_raw(cx) })
+        (suspended, VirtualAddress(thread))
     }
 
     pub fn set_entry_point(&mut self, virt: VirtualAddress) {
-        unsafe { asm!("msr ELR_EL1, {0}", in(reg) virt.0, options(nomem, nostack, preserves_flags)) }
+        unsafe {
+            asm!("msr ELR_EL1, {0}", in(reg) virt.0, options(nomem, nostack, preserves_flags))
+        }
     }
 
     pub fn set_stack_pointer(&mut self, virt: VirtualAddress) {

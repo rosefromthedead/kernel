@@ -3,9 +3,9 @@ use core::arch::asm;
 use aarch64_cpu::Writeable;
 use tracing::info_span;
 
-use crate::{arch::aarch64::regs::ExceptionClass, syscall, vm::VirtualAddress};
+use crate::{arch::aarch64::regs::ExceptionClass, context::Context, syscall, vm::VirtualAddress};
 
-use super::context::{Registers, ActiveContext};
+use super::context::{ActiveContext, Registers};
 
 // the first one in the table == base address of vector table
 extern "C" {
@@ -43,7 +43,15 @@ enum InterruptType {
 #[no_mangle]
 extern "C" fn demux_interrupt(regs: &Registers, source: InterruptSource, ty: InterruptType) {
     // not sure how to avoid the clone
-    let state = ActiveContext { registers: regs.clone() };
+    let state = ActiveContext {
+        registers: regs.clone(),
+    };
+    let cx_ptr: *const Context;
+    let cx_handle = unsafe {
+        asm!("mrs {0}, TPIDR_EL0", out(reg) cx_ptr);
+        (*cx_ptr).get_handle(state)
+    };
+
     let link: usize;
     unsafe { asm!("mrs {0}, ELR_EL1", out(reg) link) };
     let link = VirtualAddress(link);
@@ -52,7 +60,7 @@ extern "C" fn demux_interrupt(regs: &Registers, source: InterruptSource, ty: Int
     let _guard = span.enter();
 
     if syndrome.cause == ExceptionClass::SvcAa64 {
-        syscall::dispatch(syndrome.iss as usize, state);
+        syscall::dispatch(syndrome.iss as usize, cx_handle);
     } else {
         let sp: u64;
         unsafe {
@@ -64,5 +72,6 @@ extern "C" fn demux_interrupt(regs: &Registers, source: InterruptSource, ty: Int
             }
         }
         tracing::error!("unhandled exception at {link:?}!\n\n{regs} sp: {sp:#018x}");
+        core::mem::forget(cx_handle);
     }
 }

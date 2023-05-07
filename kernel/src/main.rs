@@ -9,9 +9,7 @@
 #![feature(ptr_as_uninit)]
 #![feature(pointer_is_aligned)]
 
-use alloc::boxed::Box;
-
-use crate::context::ContextState;
+use crate::context::{Context, CONTEXTS};
 
 extern crate alloc;
 
@@ -28,12 +26,12 @@ mod tracing;
 mod vm;
 
 pub fn main(arch: arch::Arch) {
-    let contexts = unsafe { &mut context::CONTEXTS };
-    let mut suspended = Box::new(arch::context::SuspendedContext::new());
-    let cx = Box::default();
-    let mut active = suspended.enter(cx);
-    contexts.insert(0, ContextState::Active);
-    active.init();
+    let context = unsafe { &mut CONTEXTS }
+        .entry(0)
+        .or_insert(Context::new(0))
+        .as_ref();
+    let mut active = unsafe { context.enter() };
+    active.arch().init();
     elf::load_elf(arch.initrd, &mut active).unwrap();
 
     unsafe { active.jump_to_userspace() };

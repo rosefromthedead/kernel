@@ -1,9 +1,16 @@
-use crate::{arch::context::ActiveContext, fmt::ForceLowerHex, vm::{Table, VirtualAddress}};
+use crate::{
+    context::ActiveContextHandle,
+    fmt::ForceLowerHex,
+    vm::{Table, VirtualAddress},
+};
 
-pub fn load_elf(file: &[u8], context: &mut ActiveContext) -> Result<(), goblin::error::Error> {
+pub fn load_elf(
+    file: &[u8],
+    context: &mut ActiveContextHandle,
+) -> Result<(), goblin::error::Error> {
     let _guard = tracing::debug_span!("loading elf file").entered();
     let elf = goblin::elf::Elf::parse(file)?;
-    let table = unsafe { context.table() };
+    let table = unsafe { context.arch().table() };
     for program_header in elf.program_headers.iter().filter(|h| h.p_type == 1) {
         let vm_range = program_header.vm_range();
         if vm_range.start == 0 {
@@ -15,9 +22,7 @@ pub fn load_elf(file: &[u8], context: &mut ActiveContext) -> Result<(), goblin::
         tracing::debug!(va=?start, size=?ForceLowerHex(size), "loading program header");
 
         table.alloc(VirtualAddress(vm_range.start), size).unwrap();
-        let dest = unsafe {
-            core::slice::from_raw_parts_mut(vm_range.start as *mut u8, size)
-        };
+        let dest = unsafe { core::slice::from_raw_parts_mut(vm_range.start as *mut u8, size) };
 
         let src = &file[program_header.file_range()];
         dest.copy_from_slice(src);
