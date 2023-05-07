@@ -103,9 +103,13 @@ impl ActiveContextHandle {
         }
         unsafe {
             let self_active = ManuallyDrop::into_inner(self.context().arch.get().read().active);
-            other
-                .active
-                .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed);
+            let activate =
+                other
+                    .active
+                    .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed);
+            if activate.is_err() {
+                panic!("tried to switch to an active context!");
+            }
             let other_suspended = ManuallyDrop::into_inner(other.arch.get().read().suspended);
             let (self_suspended, _) = self_active.suspend();
             self.context().arch.get().write(ArchContext {
