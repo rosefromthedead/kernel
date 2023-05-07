@@ -98,6 +98,9 @@ impl ActiveContextHandle {
     }
 
     pub fn switch_to(self, other: &Context) -> Self {
+        if core::ptr::eq(self.context(), other) {
+            return self;
+        }
         unsafe {
             let self_active = ManuallyDrop::into_inner(self.context().arch.get().read().active);
             other
