@@ -113,7 +113,14 @@ unsafe fn init() {
             msr TTBR1_EL1, {1}
             mrs {2}, TCR_EL1
         ", in(reg) kernel_identity_l0_addr, in(reg) kernel_table_addr, lateout(reg) tcr);
+        // make sure TTBR1_EL1 is enabled
         tcr &= !(1 << 23);
+        // set page size to 4kb
+        tcr &= !(3 << 30);
+        tcr |= 1 << 31;
+        // set VA range size to normal lol
+        tcr |= 1 << 20;
+        tcr |= 1 << 4;
         asm!("msr TCR_EL1, {0}", in(reg) tcr);
 
         SCTLR_EL1.modify(SCTLR_EL1::M::Enable);
