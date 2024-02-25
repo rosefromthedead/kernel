@@ -1,6 +1,14 @@
-use crate::{fmt::ForceLowerHex, vm::{PhysicalAddress, VirtualAddress, Table}};
+use crate::{
+    fmt::ForceLowerHex,
+    vm::{PhysicalAddress, Table, VirtualAddress},
+};
 use alloc::boxed::Box;
-use core::{arch::asm, fmt::{Debug, Formatter}, marker::PhantomData, mem::MaybeUninit};
+use core::{
+    arch::asm,
+    fmt::{Debug, Formatter},
+    marker::PhantomData,
+    mem::MaybeUninit,
+};
 
 use super::fmt::debug_page_or_block;
 
@@ -10,7 +18,7 @@ macro_rules! set_bit {
             true => *$value |= (1 << $bit),
             false => *$value &= !(1 << $bit),
         }
-    }
+    };
 }
 
 fn phys_to_virt(phys: PhysicalAddress) -> VirtualAddress {
@@ -153,7 +161,12 @@ impl<L: IntermediateLevel> Default for IntermediateTable<L> {
 
 impl Debug for IntermediateTable<Level0> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        for (i, entry) in self.entries.iter().enumerate().filter(|(_i, e)| e.is_valid()) {
+        for (i, entry) in self
+            .entries
+            .iter()
+            .enumerate()
+            .filter(|(_i, e)| e.is_valid())
+        {
             f.write_fmt(format_args!("{} {:#018x}:\n", i, entry.value))?;
             if let Some(next) = entry.get_next_table() {
                 f.write_fmt(format_args!("{:?}", next))?;
@@ -167,7 +180,12 @@ impl Debug for IntermediateTable<Level0> {
 
 impl Debug for IntermediateTable<Level1> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        for (i, entry) in self.entries.iter().enumerate().filter(|(_i, e)| e.is_valid()) {
+        for (i, entry) in self
+            .entries
+            .iter()
+            .enumerate()
+            .filter(|(_i, e)| e.is_valid())
+        {
             f.write_fmt(format_args!("  {} {:#018x}:\n", i, entry.value))?;
             if let Some(next) = entry.get_next_table() {
                 f.write_fmt(format_args!("{:?}", next))?;
@@ -181,7 +199,12 @@ impl Debug for IntermediateTable<Level1> {
 
 impl Debug for IntermediateTable<Level2> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        for (i, entry) in self.entries.iter().enumerate().filter(|(_i, e)| e.is_valid()) {
+        for (i, entry) in self
+            .entries
+            .iter()
+            .enumerate()
+            .filter(|(_i, e)| e.is_valid())
+        {
             f.write_fmt(format_args!("    {} {:#018x}:\n", i, entry.value))?;
             if let Some(next) = entry.get_next_table() {
                 f.write_fmt(format_args!("{:?}", next))?;
@@ -206,25 +229,36 @@ impl<L: IntermediateLevel> Table for IntermediateTable<L> {
             let entry = &mut self.entries[i];
             match entry.get_next_table_mut() {
                 Some(next_table) => {
-                    return next_table.map_to(virt, phys, core::cmp::min(size, L::BLOCK_SIZE as usize));
-                },
+                    return next_table.map_to(
+                        virt,
+                        phys,
+                        core::cmp::min(size, L::BLOCK_SIZE as usize),
+                    );
+                }
                 None => {
                     let frame_phys = crate::memory::FRAME_ALLOCATOR.lock().alloc();
-                    unsafe { self.insert_raw(frame_phys, i)?; }
-                    let next_table_uninit = unsafe { &mut *(phys_to_virt(frame_phys).0 as *mut MaybeUninit<L::Next>) };
+                    unsafe {
+                        self.insert_raw(frame_phys, i)?;
+                    }
+                    let next_table_uninit =
+                        unsafe { &mut *(phys_to_virt(frame_phys).0 as *mut MaybeUninit<L::Next>) };
                     let next_table: &mut L::Next = Table::clear(next_table_uninit);
                     next_table.map_to(virt, phys, size)?;
-                },
+                }
             }
             virt += L::BLOCK_SIZE as usize;
             phys += L::BLOCK_SIZE as usize;
             size = size.saturating_sub(L::BLOCK_SIZE as usize);
         }
         if L::IS_TOP_LEVEL {
-            unsafe { asm!("
+            unsafe {
+                asm!(
+                    "
                 dsb ishst
                 isb
-            "); }
+            "
+                );
+            }
         }
         Ok(())
     }
@@ -250,10 +284,7 @@ impl<L: IntermediateLevel> Table for IntermediateTable<L> {
     fn clear<'a>(this: &'a mut MaybeUninit<Self>) -> &'a mut Self {
         unsafe {
             // why even bother writing rust at this point
-            let this_inner = core::mem::transmute::<
-                _,
-                &mut [MaybeUninit<u64>; 512],
-            >(&mut *this);
+            let this_inner = core::mem::transmute::<_, &mut [MaybeUninit<u64>; 512]>(&mut *this);
             for entry in this_inner.iter_mut() {
                 entry.write(0);
             }
@@ -274,16 +305,18 @@ impl<L: IntermediateLevel> Debug for IntermediateTableEntry<L> {
             return write!(f, "{:?}", Option::<()>::None);
         }
         if let Some(table) = self.table_address() {
-            return f.debug_tuple("Table")
+            return f
+                .debug_tuple("Table")
                 .field(&ForceLowerHex(self.value))
                 .field(unsafe { &*(phys_to_virt(table).0 as *const L::Next) })
-                .finish()
+                .finish();
         }
         if let Some(block) = self.block_address() {
-            return f.debug_tuple("Block")
+            return f
+                .debug_tuple("Block")
                 .field(&ForceLowerHex(self.value))
                 .field(&block)
-                .finish()
+                .finish();
         }
         unreachable!()
     }
@@ -567,15 +600,28 @@ impl Default for Level3Table {
 
 impl Debug for Level3Table {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        for (i, entry) in self.entries.iter().enumerate().filter(|(_i, e)| e.is_valid()) {
-            f.write_fmt(format_args!("      {} {:#018x}: {:?}\n", i, entry.value, entry))?;
+        for (i, entry) in self
+            .entries
+            .iter()
+            .enumerate()
+            .filter(|(_i, e)| e.is_valid())
+        {
+            f.write_fmt(format_args!(
+                "      {} {:#018x}: {:?}\n",
+                i, entry.value, entry
+            ))?;
         }
         Ok(())
     }
 }
 
 impl Table for Level3Table {
-    fn map_to(&mut self, virt: VirtualAddress, phys: PhysicalAddress, size: usize) -> Result<(), ()> {
+    fn map_to(
+        &mut self,
+        virt: VirtualAddress,
+        phys: PhysicalAddress,
+        size: usize,
+    ) -> Result<(), ()> {
         let start_idx = virt.0 >> 12 & 0x1FF;
         let end_idx = (virt.0 + size - 1) >> 12 & 0x1FF;
         for i in start_idx..=end_idx {
@@ -600,10 +646,7 @@ impl Table for Level3Table {
     fn clear<'a>(this: &'a mut MaybeUninit<Self>) -> &'a mut Self {
         unsafe {
             // why even bother writing rust at this point
-            let this_inner = core::mem::transmute::<
-                _,
-                &mut [MaybeUninit<u64>; 512],
-            >(&mut *this);
+            let this_inner = core::mem::transmute::<_, &mut [MaybeUninit<u64>; 512]>(&mut *this);
             for entry in this_inner.iter_mut() {
                 entry.write(0);
             }
@@ -653,4 +696,3 @@ impl PageOrBlockDesc for Level3TableEntry {
         &mut self.value
     }
 }
-

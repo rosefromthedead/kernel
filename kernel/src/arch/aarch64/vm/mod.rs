@@ -19,15 +19,18 @@ pub unsafe fn switch_table(phys: PhysicalAddress) {
 pub fn init_user_table(phys: PhysicalAddress) {
     unsafe {
         KERNEL_TABLE.map_to(USER_TABLE_SCRATCH, phys, 4096).unwrap();
-        let new_table_uninit = unsafe { &mut *(USER_TABLE_SCRATCH.0 as *mut MaybeUninit<TopLevelTable>) };
+        let new_table_uninit =
+            unsafe { &mut *(USER_TABLE_SCRATCH.0 as *mut MaybeUninit<TopLevelTable>) };
         let init: &mut TopLevelTable = Table::clear(new_table_uninit);
         // recursive mapping!
         unsafe {
             init.insert_raw(get_current_user_table(), 511).unwrap();
-            asm!("
+            asm!(
+                "
                 tlbi vmalle1
                 isb
-            ");
+            "
+            );
         }
         KERNEL_TABLE.unmap(USER_TABLE_SCRATCH, 4096);
     }
@@ -43,8 +46,8 @@ pub fn get_current_user_table() -> PhysicalAddress {
     PhysicalAddress(table_phys & 0x0000_FFFF_FFFF_FFFE)
 }
 
-pub(super) mod table;
 mod fmt;
+pub(super) mod table;
 
 pub(super) const KERNEL_OFFSET: usize = 0xFFFF_0000_0000_0000;
 pub(super) const KERNEL_LOAD_PHYS: PhysicalAddress = PhysicalAddress(0x4020_0000);

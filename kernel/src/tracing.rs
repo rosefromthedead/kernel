@@ -1,8 +1,11 @@
-use core::{num::NonZeroU64, sync::atomic::{AtomicU64, Ordering::Relaxed, AtomicBool}};
+use core::{
+    num::NonZeroU64,
+    sync::atomic::{AtomicBool, AtomicU64, Ordering::Relaxed},
+};
 
 use alloc::{collections::BTreeMap, string::String};
 use spin::Mutex;
-use tracing::{Metadata, Subscriber, span};
+use tracing::{span, Metadata, Subscriber};
 use tracing_core::span::Current;
 
 pub static RESET: AtomicBool = AtomicBool::new(false);
@@ -75,8 +78,7 @@ impl Subscriber for PutcharSubscriber {
         let span = Span {
             metadata: attrs.metadata(),
             fields: visitor.0,
-            parent: attrs.parent().cloned()
-                .or(self.get_current_span()),
+            parent: attrs.parent().cloned().or(self.get_current_span()),
         };
 
         let id = self.next.fetch_add(1, Relaxed);
@@ -89,7 +91,12 @@ impl Subscriber for PutcharSubscriber {
     fn record(&self, id: &span::Id, values: &span::Record<'_>) {
         let mut visitor = DebugVisitor::new();
         values.record(&mut visitor);
-        self.spans.lock().get_mut(&id.into_u64()).unwrap().fields.append(&mut visitor.0);
+        self.spans
+            .lock()
+            .get_mut(&id.into_u64())
+            .unwrap()
+            .fields
+            .append(&mut visitor.0);
     }
 
     fn record_follows_from(&self, _id: &span::Id, _follows: &span::Id) {
@@ -98,8 +105,7 @@ impl Subscriber for PutcharSubscriber {
 
     fn event(&self, event: &tracing::Event<'_>) {
         let spans = self.spans.lock();
-        let id = event.parent().cloned()
-            .or(self.get_current_span());
+        let id = event.parent().cloned().or(self.get_current_span());
         match id {
             Some(id) => {
                 fn print_span_with_parents(spans: &BTreeMap<u64, Span>, span: &Span) {
@@ -118,9 +124,17 @@ impl Subscriber for PutcharSubscriber {
                 let span = spans.get(&id.into_u64()).unwrap();
                 print_span_with_parents(&spans, span);
 
-                print!("  \\ {}: {} ", event.metadata().level(), event.metadata().name().trim_start_matches("event "));
-            },
-            None => print!("{}: {} ", event.metadata().level(), event.metadata().name().trim_start_matches("event ")),
+                print!(
+                    "  \\ {}: {} ",
+                    event.metadata().level(),
+                    event.metadata().name().trim_start_matches("event ")
+                );
+            }
+            None => print!(
+                "{}: {} ",
+                event.metadata().level(),
+                event.metadata().name().trim_start_matches("event ")
+            ),
         }
         event.record(&mut PrintVisitor);
         println!();
@@ -131,10 +145,17 @@ impl Subscriber for PutcharSubscriber {
     }
 
     fn exit(&self, span: &span::Id) {
-        let parent = self.spans.lock().get(&span.into_u64()).unwrap().parent.clone();
+        let parent = self
+            .spans
+            .lock()
+            .get(&span.into_u64())
+            .unwrap()
+            .parent
+            .clone();
         self.current_span.store(
             parent.as_ref().map(span::Id::into_u64).unwrap_or(0),
-            Relaxed);
+            Relaxed,
+        );
     }
 
     fn current_span(&self) -> Current {
@@ -143,7 +164,7 @@ impl Subscriber for PutcharSubscriber {
             id => {
                 let metadata = self.spans.lock().get(&id).unwrap().metadata;
                 Current::new(span::Id::from_u64(id), metadata)
-            },
+            }
         }
     }
 }

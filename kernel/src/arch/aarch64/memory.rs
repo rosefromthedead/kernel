@@ -1,8 +1,15 @@
 use linked_list_allocator::Heap;
 
-use crate::{vm::{PhysicalAddress, Table}, arch::vm::table::{IntermediateLevel, Level1, Level2}, memory::KERNEL_HEAP_ALLOCATOR};
+use crate::{
+    arch::vm::table::{IntermediateLevel, Level1, Level2},
+    memory::KERNEL_HEAP_ALLOCATOR,
+    vm::{PhysicalAddress, Table},
+};
 
-use super::vm::{table::{IntermediateTable, Level0}, KERNEL_HEAP_START};
+use super::vm::{
+    table::{IntermediateTable, Level0},
+    KERNEL_HEAP_START,
+};
 
 #[repr(align(4096))]
 pub struct Page([u8; 4096]);
@@ -63,6 +70,8 @@ pub fn init_early_heap(table: &mut IntermediateTable<Level0>) {
 }
 
 pub fn init_main_heap(table: &mut IntermediateTable<Level0>) {
-    table.alloc(KERNEL_HEAP_START + 4096, 1048576 - 4096).unwrap();
+    table
+        .alloc(KERNEL_HEAP_START + 4096, 1048576 - 4096)
+        .unwrap();
     unsafe { KERNEL_HEAP_ALLOCATOR.lock().extend(1048576 - 4096) };
 }

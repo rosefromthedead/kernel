@@ -97,7 +97,10 @@ pub trait Table: Sized {
         self.unmap(virt, size);
         size = (size + 4095) / 4096 * 4096;
         while size > 0 {
-            let Chunk { phys: chunk_phys, size: chunk_size } = {
+            let Chunk {
+                phys: chunk_phys,
+                size: chunk_size,
+            } = {
                 let mut frame_alloc = crate::memory::FRAME_ALLOCATOR.lock();
                 frame_alloc.alloc_range(size)
             };

@@ -1,5 +1,5 @@
-use alloc::vec::Vec;
 use crate::{arch::FRAME_SIZE, vm::PhysicalAddress};
+use alloc::vec::Vec;
 use linked_list_allocator::LockedHeap;
 
 #[global_allocator]
@@ -32,15 +32,13 @@ pub struct Chunk {
 
 impl FrameAllocator {
     pub const fn empty() -> Self {
-        Self {
-            holes: Vec::new(),
-        }
+        Self { holes: Vec::new() }
     }
 
     pub fn insert_hole(&mut self, start: PhysicalAddress, size: usize) {
         let start = start.0 / FRAME_SIZE;
         let size = size / FRAME_SIZE;
-        
+
         // The holes list is sorted; find where the new one should go
         let mut idx = 0;
         while let Some(hole) = self.holes.get(idx) {
@@ -118,7 +116,6 @@ impl FrameAllocator {
         self.insert_hole(phys, 1);
     }
 }
-
 
 /*
 pub struct IntrusiveLinkedListAllocator {

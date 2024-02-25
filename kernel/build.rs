@@ -1,4 +1,4 @@
-use std::{path::PathBuf, env::var};
+use std::{env::var, path::PathBuf};
 
 fn main() {
     if var("CARGO_FEATURE_BUILD_ASM").as_deref() != Ok("1") {
@@ -9,11 +9,11 @@ fn main() {
     println!("cargo:rerun-if-changed=src/arch/{}/asm", target_arch);
 
     cc::Build::new()
-        .files(std::fs::read_dir::<PathBuf>(
-                format!("src/arch/{}/asm/", target_arch).into())
+        .files(
+            std::fs::read_dir::<PathBuf>(format!("src/arch/{}/asm/", target_arch).into())
                 .unwrap()
                 .filter_map(Result::ok)
-                .map(|dir_entry| dir_entry.path())
-            )
+                .map(|dir_entry| dir_entry.path()),
+        )
         .compile("kernel_asm");
 }
