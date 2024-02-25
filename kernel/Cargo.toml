@@ -15,7 +15,7 @@ fdt = { git = "https://gitlab.redox-os.org/rosehuds/fdt" }
 spin = "0.5.2"
 tracing = { version = "0.1", default-features = false, features = ["attributes"] }
 tracing-core = { version = "0.1", default-features = false }
-goblin = { version = "0.4", default-features = false, features = ["endian_fd", "elf32", "elf64"] }
+goblin = { version = "0.8", default-features = false, features = ["endian_fd", "elf32", "elf64"] }
 ring-buffer = { path = "../../ring-buffer" }
 
 [build-dependencies]
