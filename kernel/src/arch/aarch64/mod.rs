@@ -228,13 +228,19 @@ unsafe fn init() {
         .properties()
         .find(|p| p.name == "linux,initrd-end")
         .unwrap();
-    let initrd_start = BE::read_uint(initrd_start_prop.data, 4) as usize;
-    let initrd_end = BE::read_uint(initrd_end_prop.data, 4) as usize;
+    let initrd_start = BE::read_uint(initrd_start_prop.data, initrd_start_prop.data.len()) as usize;
+    let initrd_end = BE::read_uint(initrd_end_prop.data, initrd_end_prop.data.len()) as usize;
     let initrd_size = initrd_end - initrd_start;
+    let initrd_start = PhysicalAddress(initrd_start);
+    tracing::debug!(
+        "found initrd at {:x?}, size {:x?}",
+        initrd_start,
+        initrd_size
+    );
     KERNEL_TABLE
         .map_to(
             VirtualAddress(0xFFFF_1000_4000_0000),
-            PhysicalAddress(initrd_start),
+            initrd_start,
             initrd_size,
         )
         .unwrap();
